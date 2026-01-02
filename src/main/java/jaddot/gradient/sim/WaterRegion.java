@@ -13,7 +13,7 @@ public class WaterRegion {
 
     // limits so one cell can't dump everything in a single tick
     private static final int MAX_VERTICAL_OUT_PER_CELL   = 4;
-    private static final int MAX_HORIZONTAL_OUT_PER_CELL = 4;
+    private static final int MAX_HORIZONTAL_OUT_PER_CELL = 16;
 
     private final int sizeX;
     private final int sizeY;
@@ -59,13 +59,7 @@ public class WaterRegion {
         return sum;
     }
 
-    /**
-     * Example initial scenario: a 1x7 line of full water
-     * near the TOP of the region so it falls down to the ground.
-     *
-     * World Y = originY + localY.
-     * With originY = -60 and sizeY = 16, localY = sizeY - 1 is Y = -45.
-     */
+    // 1x16 line of water
     public void initTestScenario() {
         // clear everything first
         for (int x = 0; x < sizeX; x++) {
@@ -76,19 +70,18 @@ public class WaterRegion {
             }
         }
 
-        int y = sizeY - 1;          // top layer of the region
-        int z = sizeZ / 2;          // middle in Z
+        int y = sizeY - 1;
+        int z = sizeZ / 2;
 
-        // 1x7 line along X at the top
-        int startX = Math.max(0, sizeX / 2 - 3);
-        int endX   = Math.min(sizeX - 1, startX + 6);
+        int startX = 0;
+        int endX   = sizeX - 1;
 
         for (int x = startX; x <= endX; x++) {
             level[x][y][z] = MAX_LEVEL;
         }
     }
 
-    /** One full simulation step: gravity then horizontal equalization. */
+    // full sim step
     public boolean step() {
         clearDelta();
         boolean moved = applyGravity();
@@ -119,6 +112,7 @@ public class WaterRegion {
                     if (d == 0) continue;
 
                     int newLevel = level[x][y][z] + d;
+                    // some more clamping shi
                     if (newLevel < 0) newLevel = 0;
                     if (newLevel > MAX_LEVEL) newLevel = MAX_LEVEL;
                     level[x][y][z] = newLevel;
@@ -127,7 +121,6 @@ public class WaterRegion {
         }
     }
 
-    /** Gravity: let water fall straight down, limited per cell per tick. */
     private boolean applyGravity() {
         boolean moved = false;
 
@@ -156,10 +149,6 @@ public class WaterRegion {
         return moved;
     }
 
-    /**
-     * Horizontal Water Alg, only on supported cells:
-     * a cell only spreads sideways if the block below is full or it's at the bottom.
-     */
     private boolean applyHorizontalEqualization() {
         boolean moved = false;
 
@@ -169,7 +158,6 @@ public class WaterRegion {
                     int here = level[x][y][z];
                     if (here == 0) continue;
 
-                    // skip if it can still fall: only equalize supported cells
                     if (y > 0 && level[x][y - 1][z] < MAX_LEVEL) {
                         continue;
                     }
@@ -179,8 +167,8 @@ public class WaterRegion {
                     for (int dx = -HORIZ_RADIUS; dx <= HORIZ_RADIUS; dx++) {
                         for (int dz = -HORIZ_RADIUS; dz <= HORIZ_RADIUS; dz++) {
                             if (dx == 0 && dz == 0) continue;
-                            if (Math.max(Math.abs(dx), Math.abs(dz)) > HORIZ_RADIUS) continue;
 
+                            // some more bounds checking
                             int nx = x + dx;
                             int nz = z + dz;
                             if (nx < 0 || nx >= sizeX || nz < 0 || nz >= sizeZ) continue;
