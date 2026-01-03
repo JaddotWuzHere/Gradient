@@ -1,6 +1,7 @@
 package jaddot.gradient.mc;
 
 import jaddot.gradient.world.WaterRegionManager;
+import net.minecraft.block.Blocks;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
@@ -9,7 +10,8 @@ public class WaterHooks {
 
     public static void onRedstonePlaced(ServerWorld world, BlockPos pos) {
         WaterRegionManager manager = getManager();
-        manager.ensureRegionForBlock(pos);
+        manager.injectWater(pos);
+        world.setBlockState(pos, Blocks.SNOW_BLOCK.getDefaultState());
     }
 
     public static void onWorldTick(ServerWorld world) {

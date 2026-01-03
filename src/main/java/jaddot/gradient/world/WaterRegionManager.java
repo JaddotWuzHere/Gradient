@@ -36,10 +36,30 @@ public class WaterRegionManager {
         }
     }
 
-    // actually generate a region for the block if it doesn't exist
-    public WaterRegion ensureRegionForBlock(BlockPos pos) {
+    public BlockPos getRegionOrigin(RegionKey key) {
+        int originX = key.rx * REGION_SIZE_X;
+        int originY = key.ry * REGION_SIZE_Y;
+        int originZ = key.rz * REGION_SIZE_Z;
+        return new BlockPos(originX, originY, originZ);
+    }
+
+    // places water at pos, also adds a region if there isn't one there
+    public WaterRegion injectWater(BlockPos pos) {
+        // ensures region
         RegionKey rKey = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
-        return getOrCreateRegion(rKey);
+        WaterRegion region = getOrCreateRegion(rKey);
+
+        // calc region origin
+        BlockPos origin = getRegionOrigin(rKey);
+
+        int ox = pos.getX() - origin.getX();
+        int oy = pos.getY() - origin.getY();
+        int oz = pos.getZ() - origin.getZ();
+
+        // inject water
+        region.setLevel(ox, oy, oz, WaterRegion.MAX_LEVEL);
+
+        return region;
     }
 
     public void tick(ServerWorld world) {
