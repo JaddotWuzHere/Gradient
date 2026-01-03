@@ -11,7 +11,6 @@ public class WaterHooks {
     public static void onRedstonePlaced(ServerWorld world, BlockPos pos) {
         WaterRegionManager manager = getManager();
         manager.injectWater(pos);
-        world.setBlockState(pos, Blocks.SNOW_BLOCK.getDefaultState());
     }
 
     public static void onWorldTick(ServerWorld world) {

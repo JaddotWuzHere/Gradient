@@ -1,6 +1,9 @@
 package jaddot.gradient.world;
 
+import jaddot.gradient.ModBlocks;
+import jaddot.gradient.ModBlocks;
 import jaddot.gradient.sim.WaterRegion;
+import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
@@ -67,8 +70,38 @@ public class WaterRegionManager {
             return;
         }
 
-        for (WaterRegion region : regions.values()) {
-            region.step();
+        for (var entry : regions.entrySet()) {
+            RegionKey key = entry.getKey();
+            WaterRegion region = entry.getValue();
+
+            region.step(); //actual water alg
+
+            BlockPos origin = getRegionOrigin(key);
+
+            for (int x = 0; x < REGION_SIZE_X; x++) {
+                for (int y = 0; y < REGION_SIZE_Y; y++) {
+                    for (int z = 0; z < REGION_SIZE_Z; z++) {
+                        int wl = region.getLevel(x, y, z);
+
+                        int wx = origin.getX() + x;
+                        int wy = origin.getY() + y;
+                        int wz = origin.getZ() + z;
+                        BlockPos pos = new BlockPos(wx, wy, wz);
+
+                        if (wl <= 0) {
+                            continue;
+                        }
+
+                        int layers = (wl + 1) / 2;
+
+                        world.setBlockState(
+                                pos,
+                                ModBlocks.WATER_LAYER.getDefaultState()
+                                        .with(SnowBlock.LAYERS, layers)
+                        );
+                    }
+                }
+            }
         }
     }
 }

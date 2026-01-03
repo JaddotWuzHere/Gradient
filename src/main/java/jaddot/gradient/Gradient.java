@@ -19,6 +19,8 @@ public class Gradient implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Gradient initializing");
 
+		ModBlocks.register();
+
 		ServerTickEvents.END_WORLD_TICK.register(WaterHooks::onWorldTick);
 
 		// some detection of where the redstone block was placed
