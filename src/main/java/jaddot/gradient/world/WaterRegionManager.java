@@ -122,6 +122,7 @@ public class WaterRegionManager {
             }
 
             if (!stillActive) {
+                LOGGER.info("okay this region of key {} is steady now", rKey.rx + " " + rKey.ry + " " + rKey.rz);
                 iterator.remove();
             }
         }
