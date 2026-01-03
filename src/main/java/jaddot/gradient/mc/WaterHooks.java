@@ -10,7 +10,7 @@ public class WaterHooks {
 
     public static void onRedstonePlaced(ServerWorld world, BlockPos pos) {
         WaterRegionManager manager = getManager();
-        manager.injectWater(pos);
+        manager.injectWater(world, pos);
     }
 
     public static void onWorldTick(ServerWorld world) {
