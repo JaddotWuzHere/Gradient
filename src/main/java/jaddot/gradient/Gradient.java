@@ -4,10 +4,12 @@ import jaddot.gradient.mc.WaterHooks;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
+import org.apache.logging.log4j.core.jmx.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +46,13 @@ public class Gradient implements ModInitializer {
 			}
 
 			return ActionResult.PASS;
+		});
+
+		// other detections to wake sim
+		PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
+			if (world instanceof ServerWorld serverWorld) {
+				WaterHooks.onBlockBroken(serverWorld, pos, state);
+			}
 		});
 
 

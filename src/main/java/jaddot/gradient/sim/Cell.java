@@ -13,28 +13,23 @@ public class Cell {
         this.z = z;
     }
 
-    public Set<Cell> getCardinalNeighbors() {
-        Set<Cell> set = new HashSet<>();
+    public void getVerticalNeighbors(Set<Cell> set) {
+        set.add(new Cell(x, y - 1, z)); // down
+        set.add(new Cell(x, y + 1, z)); // up
+    }
+
+    public void getCardinalNeighbors(Set<Cell> set) {
         set.add(new Cell(x, y, z - 1)); // north
         set.add(new Cell(x, y, z + 1)); // south
         set.add(new Cell(x + 1, y, z)); // east
         set.add(new Cell(x - 1, y, z)); // west
-
-        set.add(new Cell(x, y - 1, z)); // down
-
-        return set;
     }
 
-    // lowkey kinda fucked rn i'll fix this if i need it
-    public Set<Cell> getAllNeighbors() {
-        Set<Cell> set = this.getCardinalNeighbors();
-
+    public void getCornerNeighbors(Set<Cell> set) {
         set.add(new Cell(x + 1, y, z - 1)); // northeast
         set.add(new Cell(x - 1, y, z - 1)); // northwest
         set.add(new Cell(x + 1, y, z + 1)); // southeast
         set.add(new Cell(x - 1, y, z + 1)); // southwest
-
-        return set;
     }
 
     @Override

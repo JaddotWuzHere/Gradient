@@ -10,7 +10,7 @@ import static jaddot.gradient.Gradient.LOGGER;
 public class WaterRegion {
 
     public static final int MAX_LEVEL = 16;
-    public static final int MAX_DOWNWARD_MOVEMENT = 8;
+    public static final int MAX_DOWNWARD_MOVEMENT = 3;
 
     private final int sizeX, sizeY, sizeZ;
     private final int[][][] levels;
@@ -82,7 +82,11 @@ public class WaterRegion {
             Cell c = currentActive.remove();
             activeCells[c.x][c.y][c.z] = false;
 
-            Set<Cell> neighbors = c.getCardinalNeighbors();
+            Set<Cell> neighbors = new HashSet<>();
+            c.getCardinalNeighbors(neighbors);
+            neighbors.add(new Cell(c.x, c.y - 1, c.z));
+            // neighbors include all cardinal neighbors plus down
+            // for transfer consideration (NOT DISTURB BRUH)
 
             for (Cell n : neighbors) {
                 // ignore n if it's out of region
@@ -117,6 +121,24 @@ public class WaterRegion {
                 if (!activeCells[c.x][c.y][c.z]) {
                     activeCells[c.x][c.y][c.z] = true;
                     nextActive.add(c);
+                }
+
+                Set<Cell> toBeActive = new HashSet<>();
+                c.getCardinalNeighbors(toBeActive);
+                c.getVerticalNeighbors(toBeActive);
+
+                // set neighboring cells active
+                for (Cell n : toBeActive) {
+                    if (n.x < 0 || n.x >= sizeX ||
+                        n.y < 0 || n.y >= sizeY ||
+                        n.z < 0 || n.z >= sizeZ) {
+                        continue;
+                    }
+
+                    if (!activeCells[n.x][n.y][n.z]) {
+                        activeCells[n.x][n.y][n.z] = true;
+                        nextActive.add(n);
+                    }
                 }
             }
         }

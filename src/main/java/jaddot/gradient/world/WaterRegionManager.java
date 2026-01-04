@@ -6,7 +6,9 @@ import net.minecraft.block.Blocks;
 import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import org.apache.logging.log4j.core.jmx.Server;
 
+import javax.swing.plaf.synth.Region;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -75,6 +77,25 @@ public class WaterRegionManager {
         return region;
     }
 
+    public void removeWaterAt(ServerWorld world, BlockPos pos) {
+        RegionKey rKey = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
+        WaterRegion region = regions.get(rKey);
+        if (region == null) return; // shouldn't happen tho
+
+        BlockPos origin = getRegionOrigin(rKey);
+        int x = pos.getX() - origin.getX();
+        int y = pos.getY() - origin.getY();
+        int z = pos.getZ() - origin.getZ();
+
+        if (x < 0 || x >= REGION_SIZE_X ||
+                y < 0 || y >= REGION_SIZE_Y ||
+                z < 0 || z >= REGION_SIZE_Z) {
+            return;
+        }
+
+        region.setLevel(x, y, z, 0);
+    }
+
     public void disturb(ServerWorld world, BlockPos pos) {
         RegionKey rKey = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
         WaterRegion region = getOrCreateRegion(rKey);
@@ -87,6 +108,17 @@ public class WaterRegionManager {
         region.markCellActive(x, y, z);
 
         activeRegions.add(rKey);
+    }
+
+    public void disturbAround(ServerWorld world, BlockPos pos) {
+        disturb(world, pos);
+
+        disturb(world, pos.up());
+        disturb(world, pos.down());
+        disturb(world, pos.north());
+        disturb(world, pos.south());
+        disturb(world, pos.east());
+        disturb(world, pos.west());
     }
 
     public void syncSolids(ServerWorld world, RegionKey rKey, WaterRegion region) {
@@ -123,7 +155,7 @@ public class WaterRegionManager {
 
     public void tick(ServerWorld world) {
         // temporary delay (get rid of this later)
-        if ((world.getTime() % 5L) != 0L) {
+        if ((world.getTime() % 2L) != 0L) {
             return;
         }
 
