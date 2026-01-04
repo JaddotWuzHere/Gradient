@@ -9,11 +9,14 @@ import static jaddot.gradient.Gradient.LOGGER;
 
 public class WaterRegion {
 
+    public static final int MAX_LEVEL = 16;
+    public static final int MAX_DOWNWARD_MOVEMENT = 8;
+
     private final int sizeX, sizeY, sizeZ;
     private final int[][][] levels;
     private final int[][][] deltas;
 
-    public static final int MAX_LEVEL = 16;
+    private final boolean[][][] solids;
 
     private final boolean[][][] activeCells;
 
@@ -26,10 +29,17 @@ public class WaterRegion {
 
         levels = new int[sizeX][sizeY][sizeZ];
         deltas = new int[sizeX][sizeY][sizeZ];
+
+        solids = new boolean[sizeX][sizeY][sizeZ];
+
         activeCells = new boolean[sizeX][sizeY][sizeZ];
 
         currentActive = new ArrayDeque<>();
     }
+
+    /* -------------------------------------------- */
+    /*               setters/getters                */
+    /* -------------------------------------------- */
 
     public int getLevel(int x, int y, int z) {
         return levels[x][y][z];
@@ -39,6 +49,18 @@ public class WaterRegion {
         // requires 0 <= value <= MAX_LEVEL
         levels[x][y][z] = value;
     }
+
+    public boolean isSolid(int x, int y, int z) {
+        return solids[x][y][z];
+    }
+
+    public void setSolid(int x, int y, int z, boolean value) {
+        solids[x][y][z] = value;
+    }
+
+    /* -------------------------------------------- */
+    /*            foundational structure            */
+    /* -------------------------------------------- */
 
     public void markCellActive(int x, int y, int z) {
         if (!activeCells[x][y][z]) {
@@ -71,6 +93,7 @@ public class WaterRegion {
                 }
 
                 int t = computeTransfer(c, n); // this is the water alg right here
+
                 if (t != 0) {
                     deltas[c.x][c.y][c.z] -= t;
                     deltas[n.x][n.y][n.z] += t;
@@ -102,11 +125,58 @@ public class WaterRegion {
         return !currentActive.isEmpty();
     }
 
-    // Water alg
+    /* -------------------------------------------- */
+    /*               actual water alg               */
+    /* -------------------------------------------- */
+
+    // main alg
     public int computeTransfer(Cell out, Cell in) {
+        if (isVerticalDown(out, in)) {
+            return computeVerticalTransfer(out, in);
+        } else if (isHorizontal(out, in)) {
+            return computeHorizontalTransfer(out, in);
+        } else {
+            // some weird shit happened, don't change
+            LOGGER.info("what the fuck");
+            return 0;
+        }
+    }
+
+    // helpers
+    int computeVerticalTransfer(Cell out, Cell in) {
+        int outLevel = levels[out.x][out.y][out.z];
+        int inLevel  = levels[in.x][in.y][in.z];
+        boolean inSolid = solids[in.x][in.y][in.z];
+
+        if (outLevel <= 0) return 0;
+        if (inSolid) {
+            return 0;
+        }
+
+        int capacity = MAX_LEVEL - inLevel;
+        if (capacity <= 0) return 0;
+
+        int t = Math.min(outLevel, capacity);
+        t = Math.min(t, MAX_DOWNWARD_MOVEMENT);
+
+        return t;
+    }
+
+
+    int computeHorizontalTransfer(Cell out, Cell in) {
         // TODO
-        LOGGER.info("running fake water alg rn");
         return 0; //placeholder
+    }
+
+    boolean isVerticalDown(Cell out, Cell in) {
+        return out.x == in.x &&
+               out.z == in.z &&
+               out.y == in.y + 1;
+    }
+
+    boolean isHorizontal(Cell out, Cell in) {
+        return (out.x != in.x || out.z != in.z) &&
+                out.y == in.y;
     }
 
 }

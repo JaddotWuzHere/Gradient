@@ -4,6 +4,7 @@ import jaddot.gradient.world.WaterRegionManager;
 import net.minecraft.block.Blocks;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 public class WaterHooks {
     private static final WaterRegionManager MANAGER = new WaterRegionManager();
@@ -14,6 +15,9 @@ public class WaterHooks {
     }
 
     public static void onWorldTick(ServerWorld world) {
+        if (!world.getRegistryKey().equals(World.OVERWORLD)) {
+            return;
+        }
         MANAGER.tick(world);
     }
 

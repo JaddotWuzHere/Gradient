@@ -20,9 +20,12 @@ public class Cell {
         set.add(new Cell(x + 1, y, z)); // east
         set.add(new Cell(x - 1, y, z)); // west
 
+        set.add(new Cell(x, y - 1, z)); // down
+
         return set;
     }
 
+    // lowkey kinda fucked rn i'll fix this if i need it
     public Set<Cell> getAllNeighbors() {
         Set<Cell> set = this.getCardinalNeighbors();
 
@@ -43,4 +46,13 @@ public class Cell {
                y == other.y &&
                z == other.z;
     }
+
+    @Override
+    public int hashCode() {
+        int result = Integer.hashCode(x);
+        result = 31 * result + Integer.hashCode(y);
+        result = 31 * result + Integer.hashCode(z);
+        return result;
+    }
+
 }

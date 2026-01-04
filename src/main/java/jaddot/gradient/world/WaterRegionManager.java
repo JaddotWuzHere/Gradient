@@ -2,6 +2,7 @@ package jaddot.gradient.world;
 
 import jaddot.gradient.ModBlocks;
 import jaddot.gradient.sim.WaterRegion;
+import net.minecraft.block.Blocks;
 import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -24,6 +25,9 @@ public class WaterRegionManager {
         activeRegions = new HashSet<>();
     }
 
+    /* -------------------------------------------- */
+    /*              some coordinate shi             */
+    /* -------------------------------------------- */
     private RegionKey regionKeyForBlock(int worldX, int worldY, int worldZ) {
         int rx = Math.floorDiv(worldX, REGION_SIZE_X);
         int ry = Math.floorDiv(worldY, REGION_SIZE_Y);
@@ -36,7 +40,6 @@ public class WaterRegionManager {
         else {
             WaterRegion newRegion = new WaterRegion(REGION_SIZE_X, REGION_SIZE_Y, REGION_SIZE_Z);
             regions.put(key, newRegion);
-            LOGGER.info("Added new region of key {}", key.rx + " " + key.ry + " " + key.rz);
             return newRegion;
         }
     }
@@ -47,6 +50,10 @@ public class WaterRegionManager {
         int originZ = key.rz * REGION_SIZE_Z;
         return new BlockPos(originX, originY, originZ);
     }
+
+    /* -------------------------------------------- */
+    /*                functional stuff              */
+    /* -------------------------------------------- */
 
     // places water at pos, also adds a region if there isn't one there
     public WaterRegion injectWater(ServerWorld world, BlockPos pos) {
@@ -82,9 +89,41 @@ public class WaterRegionManager {
         activeRegions.add(rKey);
     }
 
+    public void syncSolids(ServerWorld world, RegionKey rKey, WaterRegion region) {
+        BlockPos origin = getRegionOrigin(rKey);
+
+        for (int x = 0; x < REGION_SIZE_X; x++) {
+            for (int y = 0; y < REGION_SIZE_Y; y++) {
+                for (int z = 0; z < REGION_SIZE_Z; z++) {
+                    int wx = origin.getX() + x;
+                    int wy = origin.getY() + y;
+                    int wz = origin.getZ() + z;
+                    BlockPos pos = new BlockPos(wx, wy, wz);
+
+                    var state = world.getBlockState(pos);
+
+                    boolean isSolid =
+                            !state.isAir() &&
+                            !state.isOf(ModBlocks.WATER_LAYER) &&
+                            !state.isOf(Blocks.REDSTONE_BLOCK);
+
+                    region.setSolid(x, y, z, isSolid);
+
+                    if (isSolid && region.getLevel(x, y, z) > 0) {
+                        region.setLevel(x, y, z, 0);
+                    }
+                }
+            }
+        }
+    }
+
+    /* -------------------------------------------- */
+    /*                   ticking                    */
+    /* -------------------------------------------- */
+
     public void tick(ServerWorld world) {
         // temporary delay (get rid of this later)
-        if ((world.getTime() % 20L) != 0L) {
+        if ((world.getTime() % 5L) != 0L) {
             return;
         }
 
@@ -93,6 +132,7 @@ public class WaterRegionManager {
             RegionKey rKey = iterator.next();
             WaterRegion region = regions.get(rKey);
 
+            syncSolids(world, rKey, region);
             boolean stillActive = region.step();
 
             BlockPos origin = getRegionOrigin(rKey);
@@ -100,23 +140,24 @@ public class WaterRegionManager {
                 for (int y = 0; y < REGION_SIZE_Y; y++) {
                     for (int z = 0; z < REGION_SIZE_Z; z++) {
                         int wl = region.getLevel(x, y, z);
+                        boolean solidHere = region.isSolid(x, y, z);
 
                         int wx = origin.getX() + x;
                         int wy = origin.getY() + y;
                         int wz = origin.getZ() + z;
                         BlockPos pos = new BlockPos(wx, wy, wz);
 
-                        if (wl <= 0) {
-                            continue;
+                        var state = world.getBlockState(pos);
+                        if (wl > 0 && !solidHere) {
+                            int layers = (wl + 1) / 2;
+                            world.setBlockState(
+                                    pos,
+                                    ModBlocks.WATER_LAYER.getDefaultState()
+                                            .with(SnowBlock.LAYERS, layers)
+                            );
+                        } else if (wl == 0 && state.isOf(ModBlocks.WATER_LAYER)) {
+                            world.setBlockState(pos, Blocks.AIR.getDefaultState());
                         }
-
-                        int layers = (wl + 1) / 2;
-
-                        world.setBlockState(
-                                pos,
-                                ModBlocks.WATER_LAYER.getDefaultState()
-                                        .with(SnowBlock.LAYERS, layers)
-                        );
                     }
                 }
             }
