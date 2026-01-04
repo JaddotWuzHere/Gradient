@@ -2,13 +2,12 @@ package jaddot.gradient.world;
 
 import jaddot.gradient.ModBlocks;
 import jaddot.gradient.sim.WaterRegion;
+import jaddot.gradient.sim.WaterSimState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
-import org.apache.logging.log4j.core.jmx.Server;
 
-import javax.swing.plaf.synth.Region;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -22,9 +21,12 @@ public class WaterRegionManager {
     private final HashMap<RegionKey, WaterRegion> regions;
     private final HashSet<RegionKey> activeRegions;
 
-    public WaterRegionManager() {
-        regions = new HashMap<>();
-        activeRegions = new HashSet<>();
+    private final WaterSimState save;
+
+    public WaterRegionManager(WaterSimState save) {
+        this.save = save;
+        this.regions = new HashMap<>();
+        this.activeRegions = new HashSet<>();
     }
 
     /* -------------------------------------------- */
@@ -38,12 +40,28 @@ public class WaterRegionManager {
     }
 
     public WaterRegion getOrCreateRegion(RegionKey key) {
-        if (regions.containsKey(key)) return regions.get(key);
-        else {
-            WaterRegion newRegion = new WaterRegion(REGION_SIZE_X, REGION_SIZE_Y, REGION_SIZE_Z);
-            regions.put(key, newRegion);
-            return newRegion;
+        WaterRegion region = regions.get(key);
+        if (region != null) {
+            return region;
         }
+
+        // assert region doesn't exist yet
+        region = new WaterRegion(REGION_SIZE_X, REGION_SIZE_Y, REGION_SIZE_Z);
+
+        WaterSimState.RegionSnapshot snap = save.getSnapshot(key);
+        if (snap != null) {
+            // assert this region has been loaded before
+
+            // load that shi
+            region.loadFlatLevels(snap.getLevels());
+
+            if (region.boostrapActivityFromLevels()) {
+                activeRegions.add(key);
+            }
+        }
+
+        regions.put(key, region);
+        return region;
     }
 
     public BlockPos getRegionOrigin(RegionKey key) {
@@ -150,11 +168,21 @@ public class WaterRegionManager {
     }
 
     /* -------------------------------------------- */
+    /*                   nbt shit                   */
+    /* -------------------------------------------- */
+
+    public void bootstrapAllFromSnapshots() {
+        for (RegionKey key: save.getSnapshotKeys()) {
+            getOrCreateRegion(key);
+        }
+    }
+
+    /* -------------------------------------------- */
     /*                   ticking                    */
     /* -------------------------------------------- */
 
     public void tick(ServerWorld world) {
-        // temporary delay (get rid of this later)
+        // simulation speed (one step every x ticks)
         if ((world.getTime() % 2L) != 0L) {
             return;
         }
@@ -195,9 +223,13 @@ public class WaterRegionManager {
             }
 
             if (!stillActive) {
-                LOGGER.info("okay this region of key {} is steady now", rKey.rx + " " + rKey.ry + " " + rKey.rz);
                 iterator.remove();
             }
+
+            // save snapshot
+            byte[] flatLevels = region.toFlatLevels();
+            WaterSimState.RegionSnapshot snapshot = new WaterSimState.RegionSnapshot(flatLevels);
+            save.putSnapshot(rKey, snapshot);
         }
     }
 }

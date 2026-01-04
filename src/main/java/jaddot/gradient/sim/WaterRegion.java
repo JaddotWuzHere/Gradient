@@ -59,6 +59,84 @@ public class WaterRegion {
     }
 
     /* -------------------------------------------- */
+    /*                  nbt stuff                   */
+    /* -------------------------------------------- */
+
+    public byte[] toFlatLevels() {
+        byte[] flattened = new byte[sizeX * sizeY * sizeZ];
+        int i = 0;
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    int level = levels[x][y][z];
+                    if (level < 0) level = 0;
+                    if (level > MAX_LEVEL) level = MAX_LEVEL;
+                    flattened[i] = (byte) level;
+                    i++;
+                }
+            }
+        }
+        return flattened;
+    }
+
+    public void loadFlatLevels(byte[] flattened) {
+        int expected = sizeX * sizeY * sizeZ;
+        // some error thingy
+        if (flattened.length != expected) throw new IllegalArgumentException("sum fucked up cuh");
+
+        int i = 0;
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    int level = flattened[i] & 0xFF;
+                    if (level > MAX_LEVEL) level = MAX_LEVEL;
+                    levels[x][y][z] = level;
+                    i++;
+                }
+            }
+        }
+
+        // clear the old stuff
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    deltas[x][y][z] = 0;
+                    activeCells[x][y][z] = false;
+                }
+            }
+        }
+        currentActive.clear();
+    }
+
+    public boolean boostrapActivityFromLevels() {
+        boolean any = false;
+
+        // clear old stuff
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    activeCells[x][y][z] = false;
+                }
+            }
+        }
+        currentActive.clear();
+
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    int lvl = levels[x][y][z];
+                    if (lvl > 0 && !solids[x][y][z]) {
+                        markCellActive(x, y, z);
+                        any = true;
+                    }
+                }
+            }
+        }
+
+        return any;
+    }
+
+    /* -------------------------------------------- */
     /*            foundational structure            */
     /* -------------------------------------------- */
 
