@@ -1,6 +1,7 @@
 package jaddot.gradient.world;
 
 import jaddot.gradient.ModBlocks;
+import jaddot.gradient.sim.WaterDeltaSink;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
 import net.minecraft.block.Blocks;
@@ -11,9 +12,7 @@ import net.minecraft.util.math.BlockPos;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import static jaddot.gradient.Gradient.LOGGER;
-
-public class WaterRegionManager {
+public class WaterRegionManager implements WaterDeltaSink {
     private final int REGION_SIZE_X = 16;
     private final int REGION_SIZE_Y = 16;
     private final int REGION_SIZE_Z = 16;
@@ -45,8 +44,10 @@ public class WaterRegionManager {
             return region;
         }
 
+        BlockPos origin = getRegionOrigin(key);
+
         // assert region doesn't exist yet
-        region = new WaterRegion(REGION_SIZE_X, REGION_SIZE_Y, REGION_SIZE_Z);
+        region = new WaterRegion(REGION_SIZE_X, REGION_SIZE_Y, REGION_SIZE_Z, origin.getX(), origin.getY(), origin.getZ());
 
         WaterSimState.RegionSnapshot snap = save.getSnapshot(key);
         if (snap != null) {
@@ -55,7 +56,7 @@ public class WaterRegionManager {
             // load that shi
             region.loadFlatLevels(snap.getLevels());
 
-            if (region.boostrapActivityFromLevels()) {
+            if (region.bootstrapActivityFromLevels()) {
                 activeRegions.add(key);
             }
         }
@@ -104,12 +105,6 @@ public class WaterRegionManager {
         int x = pos.getX() - origin.getX();
         int y = pos.getY() - origin.getY();
         int z = pos.getZ() - origin.getZ();
-
-        if (x < 0 || x >= REGION_SIZE_X ||
-                y < 0 || y >= REGION_SIZE_Y ||
-                z < 0 || z >= REGION_SIZE_Z) {
-            return;
-        }
 
         region.setLevel(x, y, z, 0);
     }
@@ -167,6 +162,19 @@ public class WaterRegionManager {
         }
     }
 
+    @Override
+    public void add(int worldX, int worldY, int worldZ, int amount) {
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        WaterRegion region = getOrCreateRegion(key);
+
+        int localX = Math.floorMod(worldX, REGION_SIZE_X);
+        int localY = Math.floorMod(worldY, REGION_SIZE_Y);
+        int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
+
+        region.addDelta(localX, localY, localZ, amount);
+        activeRegions.add(key);
+    }
+
     /* -------------------------------------------- */
     /*                   nbt shit                   */
     /* -------------------------------------------- */
@@ -182,18 +190,20 @@ public class WaterRegionManager {
     /* -------------------------------------------- */
 
     public void tick(ServerWorld world) {
-        // simulation speed (one step every x ticks)
+        // simulation speed
         if ((world.getTime() % 2L) != 0L) {
             return;
         }
 
-        var iterator = activeRegions.iterator();
-        while (iterator.hasNext()) {
-            RegionKey rKey = iterator.next();
+        HashSet<RegionKey> toProcess = new HashSet<>(activeRegions);
+        activeRegions.clear();
+
+        for (RegionKey rKey : toProcess) {
             WaterRegion region = regions.get(rKey);
 
             syncSolids(world, rKey, region);
-            boolean stillActive = region.step();
+
+            boolean stillActive = region.step(this);
 
             BlockPos origin = getRegionOrigin(rKey);
             for (int x = 0; x < REGION_SIZE_X; x++) {
@@ -222,8 +232,8 @@ public class WaterRegionManager {
                 }
             }
 
-            if (!stillActive) {
-                iterator.remove();
+            if (stillActive) {
+                activeRegions.add(rKey);
             }
 
             // save snapshot

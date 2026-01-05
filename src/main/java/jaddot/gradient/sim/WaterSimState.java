@@ -9,7 +9,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateManager;
 
-import javax.swing.plaf.synth.Region;
 import java.util.HashMap;
 import java.util.Map;
 

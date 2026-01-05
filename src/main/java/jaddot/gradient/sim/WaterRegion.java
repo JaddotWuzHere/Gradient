@@ -12,9 +12,10 @@ public class WaterRegion {
     public static final int MAX_LEVEL = 16;
     public static final int MAX_DOWNWARD_MOVEMENT = 3;
 
+    private final int originX, originY, originZ;
     private final int sizeX, sizeY, sizeZ;
     private final int[][][] levels;
-    private final int[][][] deltas;
+    private int[][][] deltas;
 
     private final boolean[][][] solids;
 
@@ -22,10 +23,27 @@ public class WaterRegion {
 
     private Queue<Cell> currentActive;
 
-    public WaterRegion(int sizeX, int sizeY, int sizeZ) {
+    private final HashSet<Cell> touched = new HashSet<>();
+
+    private static final int[][] CARDINAL_OFFSETS = {
+            { 1, 0, 0 },
+            {-1, 0, 0 },
+            { 0, 0, 1 },
+            { 0, 0,-1 }
+    };
+
+    private static final int[][] VERTICAL_OFFSETS = {
+            { 0, 1, 0 },
+            { 0,-1, 0 }
+    };
+
+    public WaterRegion(int sizeX, int sizeY, int sizeZ, int originX, int originY, int originZ) {
         this.sizeX = sizeX;
         this.sizeY = sizeY;
         this.sizeZ = sizeZ;
+        this.originX = originX;
+        this.originY = originY;
+        this.originZ = originZ;
 
         levels = new int[sizeX][sizeY][sizeZ];
         deltas = new int[sizeX][sizeY][sizeZ];
@@ -56,6 +74,14 @@ public class WaterRegion {
 
     public void setSolid(int x, int y, int z, boolean value) {
         solids[x][y][z] = value;
+    }
+
+    public int getDelta(int x, int y, int z) {
+        return deltas[x][y][z];
+    }
+
+    public void addDelta(int x, int y, int z, int value) {
+        deltas[x][y][z] += value;
     }
 
     /* -------------------------------------------- */
@@ -105,10 +131,11 @@ public class WaterRegion {
                 }
             }
         }
+        touched.clear();
         currentActive.clear();
     }
 
-    public boolean boostrapActivityFromLevels() {
+    public boolean bootstrapActivityFromLevels() {
         boolean any = false;
 
         // clear old stuff
@@ -147,76 +174,171 @@ public class WaterRegion {
         }
     }
 
-    public boolean step() {
+    private boolean applyDeltasAndSeedActive() {
+        boolean any = false;
+
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    int d = deltas[x][y][z];
+                    if (d != 0) {
+                        levels[x][y][z] += d;
+                        deltas[x][y][z] = 0;
+                        any = true;
+
+                        if (!activeCells[x][y][z]) {
+                            activeCells[x][y][z] = true;
+                            currentActive.add(new Cell(x, y, z));
+                        }
+                    }
+                }
+            }
+        }
+
+        return any;
+    }
+
+    private void clearArray(int[][][] arr) {
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    arr[x][y][z] = 0;
+                }
+            }
+        }
+    }
+
+    public boolean step(WaterDeltaSink sink) {
+
+        boolean hadInDelta = applyDeltasAndSeedActive();
+
         if (currentActive.isEmpty()) {
             return false;
         }
 
         Queue<Cell> nextActive = new ArrayDeque<>();
 
-        Set<Cell> touched = new HashSet<>();
+        touched.clear();
 
         while (!currentActive.isEmpty()) {
             Cell c = currentActive.remove();
             activeCells[c.x][c.y][c.z] = false;
 
-            Set<Cell> neighbors = new HashSet<>();
-            c.getCardinalNeighbors(neighbors);
-            neighbors.add(new Cell(c.x, c.y - 1, c.z));
-            // neighbors include all cardinal neighbors plus down
-            // for transfer consideration (NOT DISTURB BRUH)
+            int worldCx = originX + c.x;
+            int worldCy = originY + c.y;
+            int worldCz = originZ + c.z;
 
-            for (Cell n : neighbors) {
-                // ignore n if it's out of region
-                if (n.x < 0 || n.x >= sizeX ||
-                    n.y < 0 || n.y >= sizeY ||
-                    n.z < 0 || n.z >= sizeZ) {
+            // horizontal cardinal neighbors in region only
+            for (int[] off : CARDINAL_OFFSETS) {
+                int nx = c.x + off[0];
+                int ny = c.y;
+                int nz = c.z + off[2];
+
+                // ignore oob horizontals for now
+                if (nx < 0 || nx >= sizeX ||
+                        ny < 0 || ny >= sizeY ||
+                        nz < 0 || nz >= sizeZ) {
                     continue;
                 }
 
-                int t = computeTransfer(c, n); // this is the water alg right here
+                Cell n = new Cell(nx, ny, nz);
 
+                int t = computeTransfer(c, n);
                 if (t != 0) {
-                    deltas[c.x][c.y][c.z] -= t;
-                    deltas[n.x][n.y][n.z] += t;
+                    int worldNx = originX + nx;
+                    int worldNy = originY + ny;
+                    int worldNz = originZ + nz;
+
+                    sink.add(worldCx, worldCy, worldCz, -t);
+                    sink.add(worldNx, worldNy, worldNz, +t);
 
                     touched.add(c);
                     touched.add(n);
                 }
             }
+
+            // vertical down neighbor
+            int downX = c.x;
+            int downY = c.y - 1;
+            int downZ = c.z;
+
+            if (downY >= 0 && downY < sizeY) {
+                // in bounds
+                Cell down = new Cell(downX, downY, downZ);
+
+                int t = computeTransfer(c, down);
+                if (t != 0) {
+                    int worldNx = originX + downX;
+                    int worldNy = originY + downY;
+                    int worldNz = originZ + downZ;
+
+                    sink.add(worldCx, worldCy, worldCz, -t);
+                    sink.add(worldNx, worldNy, worldNz, +t);
+
+                    touched.add(c);
+                    touched.add(down);
+                }
+            } else {
+                // oob
+                int outLevel = levels[c.x][c.y][c.z];
+                if (outLevel > 0) {
+                    int t = Math.min(outLevel, MAX_DOWNWARD_MOVEMENT);
+
+                    int worldNx = worldCx;
+                    int worldNy = worldCy - 1;
+                    int worldNz = worldCz;
+
+                    sink.add(worldCx, worldCy, worldCz, -t);
+                    sink.add(worldNx, worldNy, worldNz, +t);
+
+                    touched.add(c);
+                }
+            }
         }
 
         if (touched.isEmpty()) {
+            currentActive.clear();
             return false;
         }
 
         for (Cell c : touched) {
-            int d = deltas[c.x][c.y][c.z];
-            if (d != 0) {
-                levels[c.x][c.y][c.z] += d;
-                deltas[c.x][c.y][c.z] = 0;
+            // itself
+            if (!activeCells[c.x][c.y][c.z]) {
+                activeCells[c.x][c.y][c.z] = true;
+                nextActive.add(c);
+            }
 
-                if (!activeCells[c.x][c.y][c.z]) {
-                    activeCells[c.x][c.y][c.z] = true;
-                    nextActive.add(c);
+            // horizontal cardinal neighbors
+            for (int[] off : CARDINAL_OFFSETS) {
+                int nx = c.x + off[0];
+                int ny = c.y;
+                int nz = c.z + off[2];
+
+                if (nx < 0 || nx >= sizeX ||
+                        ny < 0 || ny >= sizeY ||
+                        nz < 0 || nz >= sizeZ) {
+                    continue;
                 }
 
-                Set<Cell> toBeActive = new HashSet<>();
-                c.getCardinalNeighbors(toBeActive);
-                c.getVerticalNeighbors(toBeActive);
+                if (!activeCells[nx][ny][nz]) {
+                    activeCells[nx][ny][nz] = true;
+                    nextActive.add(new Cell(nx, ny, nz));
+                }
+            }
 
-                // set neighboring cells active
-                for (Cell n : toBeActive) {
-                    if (n.x < 0 || n.x >= sizeX ||
-                        n.y < 0 || n.y >= sizeY ||
-                        n.z < 0 || n.z >= sizeZ) {
-                        continue;
-                    }
+            // vertical neighbors
+            for (int[] off : VERTICAL_OFFSETS) {
+                int nx = c.x;
+                int ny = c.y + off[1];
+                int nz = c.z;
 
-                    if (!activeCells[n.x][n.y][n.z]) {
-                        activeCells[n.x][n.y][n.z] = true;
-                        nextActive.add(n);
-                    }
+                if (ny < 0 || ny >= sizeY) {
+                    continue;
+                }
+
+                if (!activeCells[nx][ny][nz]) {
+                    activeCells[nx][ny][nz] = true;
+                    nextActive.add(new Cell(nx, ny, nz));
                 }
             }
         }

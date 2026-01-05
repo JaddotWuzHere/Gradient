@@ -13,25 +13,6 @@ public class Cell {
         this.z = z;
     }
 
-    public void getVerticalNeighbors(Set<Cell> set) {
-        set.add(new Cell(x, y - 1, z)); // down
-        set.add(new Cell(x, y + 1, z)); // up
-    }
-
-    public void getCardinalNeighbors(Set<Cell> set) {
-        set.add(new Cell(x, y, z - 1)); // north
-        set.add(new Cell(x, y, z + 1)); // south
-        set.add(new Cell(x + 1, y, z)); // east
-        set.add(new Cell(x - 1, y, z)); // west
-    }
-
-    public void getCornerNeighbors(Set<Cell> set) {
-        set.add(new Cell(x + 1, y, z - 1)); // northeast
-        set.add(new Cell(x - 1, y, z - 1)); // northwest
-        set.add(new Cell(x + 1, y, z + 1)); // southeast
-        set.add(new Cell(x - 1, y, z + 1)); // southwest
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
