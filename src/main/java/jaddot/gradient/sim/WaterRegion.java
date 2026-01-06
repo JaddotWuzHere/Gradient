@@ -198,17 +198,7 @@ public class WaterRegion {
         return any;
     }
 
-    private void clearArray(int[][][] arr) {
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
-                    arr[x][y][z] = 0;
-                }
-            }
-        }
-    }
-
-    public boolean step(WaterDeltaSink sink) {
+    public boolean step(WaterDeltaSink sink, WaterQuery query) {
 
         boolean hadInDelta = applyDeltasAndSeedActive();
 
@@ -281,18 +271,28 @@ public class WaterRegion {
             } else {
                 // oob
                 int outLevel = levels[c.x][c.y][c.z];
-                if (outLevel > 0) {
-                    int t = Math.min(outLevel, MAX_DOWNWARD_MOVEMENT);
+                if (outLevel <= 0) continue;
 
-                    int worldNx = worldCx;
-                    int worldNy = worldCy - 1;
-                    int worldNz = worldCz;
+                int worldNx = worldCx;
+                int worldNy = worldCy - 1;
+                int worldNz = worldCz;
 
-                    sink.add(worldCx, worldCy, worldCz, -t);
-                    sink.add(worldNx, worldNy, worldNz, +t);
+                int inLevel = query.getLevelAt(worldNx, worldNy, worldNz);
+                boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
 
-                    touched.add(c);
-                }
+                if (inSolid) continue;
+
+                int capacity = MAX_LEVEL - inLevel;
+                if (capacity <= 0) continue;
+
+                int t = Math.min(outLevel, capacity);
+                t = Math.min(t, MAX_DOWNWARD_MOVEMENT);
+                if (t <= 0) continue;
+
+                sink.add(worldCx, worldCy, worldCz, -t);
+                sink.add(worldNx, worldNy, worldNz, t);
+
+                touched.add(c);
             }
         }
 
@@ -383,7 +383,6 @@ public class WaterRegion {
 
         return t;
     }
-
 
     int computeHorizontalTransfer(Cell out, Cell in) {
         // TODO

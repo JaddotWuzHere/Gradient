@@ -2,6 +2,7 @@ package jaddot.gradient.world;
 
 import jaddot.gradient.ModBlocks;
 import jaddot.gradient.sim.WaterDeltaSink;
+import jaddot.gradient.sim.WaterQuery;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
 import net.minecraft.block.Blocks;
@@ -12,7 +13,7 @@ import net.minecraft.util.math.BlockPos;
 import java.util.HashMap;
 import java.util.HashSet;
 
-public class WaterRegionManager implements WaterDeltaSink {
+public class WaterRegionManager implements WaterDeltaSink, WaterQuery {
     private final int REGION_SIZE_X = 16;
     private final int REGION_SIZE_Y = 16;
     private final int REGION_SIZE_Z = 16;
@@ -75,6 +76,36 @@ public class WaterRegionManager implements WaterDeltaSink {
     /* -------------------------------------------- */
     /*                functional stuff              */
     /* -------------------------------------------- */
+
+    @Override
+    public int getLevelAt(int worldX, int worldY, int worldZ) {
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        WaterRegion region = regions.get(key);
+        if (region == null) {
+            return 0;
+        }
+
+        int localX = Math.floorMod(worldX, REGION_SIZE_X);
+        int localY = Math.floorMod(worldY, REGION_SIZE_Y);
+        int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
+
+        return region.getLevel(localX, localY, localZ);
+    }
+
+    @Override
+    public boolean isSolidAt(int worldX, int worldY, int worldZ) {
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        WaterRegion region = regions.get(key);
+        if (region == null) {
+            return false;
+        }
+
+        int localX = Math.floorMod(worldX, REGION_SIZE_X);
+        int localY = Math.floorMod(worldY, REGION_SIZE_Y);
+        int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
+
+        return region.isSolid(localX, localY, localZ);
+    }
 
     // places water at pos, also adds a region if there isn't one there
     public WaterRegion injectWater(ServerWorld world, BlockPos pos) {
@@ -203,7 +234,7 @@ public class WaterRegionManager implements WaterDeltaSink {
 
             syncSolids(world, rKey, region);
 
-            boolean stillActive = region.step(this);
+            boolean stillActive = region.step(this, this);
 
             BlockPos origin = getRegionOrigin(rKey);
             for (int x = 0; x < REGION_SIZE_X; x++) {
