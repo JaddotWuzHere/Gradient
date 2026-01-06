@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.WorldView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,12 +37,11 @@ public class Gradient implements ModInitializer {
 			}
 
 			BlockPos clickedPos = hitResult.getBlockPos();
-			var side = hitResult.getSide();
 
-			BlockPos placePos = clickedPos.offset(side);
+			BlockPos waterPos = chooseWaterColumnPos(world, clickedPos);
 
-			if (world instanceof ServerWorld serverWorld) {
-				WaterHooks.onRedstonePlaced(serverWorld, placePos);
+			if (waterPos != null && world instanceof ServerWorld serverWorld) {
+				WaterHooks.onRedstonePlaced(serverWorld, waterPos);
 			}
 
 			return ActionResult.PASS;
@@ -53,7 +53,18 @@ public class Gradient implements ModInitializer {
 				WaterHooks.onBlockBroken(serverWorld, pos, state);
 			}
 		});
+	}
 
+	private BlockPos chooseWaterColumnPos(WorldView world, BlockPos clickedPos) {
+		var state = world.getBlockState(clickedPos);
 
+		if (state.isAir() || state.isOf(ModBlocks.WATER_LAYER)) {
+			return clickedPos;
+		}
+
+		BlockPos above = clickedPos.up();
+		var aboveState = world.getBlockState(above);
+
+		return above;
 	}
 }

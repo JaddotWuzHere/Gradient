@@ -10,6 +10,7 @@ import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
+import javax.swing.plaf.synth.Region;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -109,22 +110,76 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery {
 
     // places water at pos, also adds a region if there isn't one there
     public WaterRegion injectWater(ServerWorld world, BlockPos pos) {
-        // ensures region
-        RegionKey rKey = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
-        WaterRegion region = getOrCreateRegion(rKey);
+        int amount = 15;
+        boolean canFit = canFitColumnAmount(world, pos, amount);
+        if (!canFit) {
+            RegionKey key = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
+            return regions.get(key);
+        }
 
-        // calc region origin
-        BlockPos origin = getRegionOrigin(rKey);
+        applyColumnAmount(world, pos, amount);
 
-        int ox = pos.getX() - origin.getX();
-        int oy = pos.getY() - origin.getY();
-        int oz = pos.getZ() - origin.getZ();
+        RegionKey key = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
+        return getOrCreateRegion(key);
+    }
 
-        // inject water
-        region.setLevel(ox, oy, oz, 15);
-        disturb(world, pos);
+    private boolean canFitColumnAmount(ServerWorld world, BlockPos pos, int amount) {
+        int remaining = amount;
 
-        return region;
+        int minY = world.getBottomY();
+        int maxY = world.getTopY();
+
+        while (remaining > 0) {
+            int y = pos.getY();
+            if (y < minY || y >= maxY) return false;
+
+            var state = world.getBlockState(pos);
+            boolean isSolid = !state.isAir() &&
+                              !state.isOf(ModBlocks.WATER_LAYER);
+
+            if (isSolid) {
+                return false;
+            }
+
+            int currentLevel = getLevelAt(pos.getX(), pos.getY(), pos.getZ());
+            int capacity = WaterRegion.MAX_LEVEL - currentLevel;
+
+            if (capacity > 0) {
+                int usedHere = Math.min(remaining, capacity);
+                remaining -= usedHere;
+            }
+
+            pos = pos.up();
+        }
+        return true;
+    }
+
+    private void applyColumnAmount(ServerWorld world, BlockPos pos, int amount) {
+        int remaining = amount;
+
+        while (remaining > 0) {
+            RegionKey key = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
+            WaterRegion region = getOrCreateRegion(key);
+
+            BlockPos origin = getRegionOrigin(key);
+            int lx = pos.getX() - origin.getX();
+            int ly = pos.getY() - origin.getY();
+            int lz = pos.getZ() - origin.getZ();
+
+            int currentLevel = region.getLevel(lx, ly, lz);
+            int capacity = WaterRegion.MAX_LEVEL - currentLevel;
+
+            if (capacity > 0) {
+                int usedHere = Math.min(remaining, capacity);
+                region.setLevel(lx, ly, lz, currentLevel + usedHere);
+
+                disturb(world, pos);
+
+                remaining -= usedHere;
+            }
+
+            pos = pos.up();
+        }
     }
 
     public void removeWaterAt(ServerWorld world, BlockPos pos) {
