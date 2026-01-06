@@ -6,10 +6,12 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.minecraft.block.BlockState;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.WorldView;
+import net.minecraft.util.math.Direction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,16 +38,20 @@ public class Gradient implements ModInitializer {
 				return ActionResult.PASS;
 			}
 
-			BlockPos clickedPos = hitResult.getBlockPos();
+			if (!(world instanceof ServerWorld serverWorld)) {
+				return ActionResult.PASS;
+			}
 
-			BlockPos waterPos = chooseWaterColumnPos(world, clickedPos);
+			BlockPos waterPos = chooseWaterColumnPos(serverWorld, hitResult);
 
-			if (waterPos != null && world instanceof ServerWorld serverWorld) {
+			if (waterPos != null) {
 				WaterHooks.onRedstonePlaced(serverWorld, waterPos);
+				return ActionResult.SUCCESS;
 			}
 
 			return ActionResult.PASS;
 		});
+
 
 		// other detections to wake sim
 		PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
@@ -55,16 +61,46 @@ public class Gradient implements ModInitializer {
 		});
 	}
 
-	private BlockPos chooseWaterColumnPos(WorldView world, BlockPos clickedPos) {
-		var state = world.getBlockState(clickedPos);
+	private BlockPos chooseWaterColumnPos(ServerWorld world, BlockHitResult hitResult) {
+		BlockPos hitPos = hitResult.getBlockPos();
+		Direction side = hitResult.getSide();
 
-		if (state.isAir() || state.isOf(ModBlocks.WATER_LAYER)) {
-			return clickedPos;
+		BlockState hitState = world.getBlockState(hitPos);
+
+		BlockPos targetPos;
+		if (isReplaceableForWater(hitState)) {
+			targetPos = hitPos;
+		} else {
+			targetPos = hitPos.offset(side);
 		}
 
-		BlockPos above = clickedPos.up();
-		var aboveState = world.getBlockState(above);
+		BlockState targetState = world.getBlockState(targetPos);
 
-		return above;
+		if (targetState.isOf(ModBlocks.WATER_LAYER)) {
+			BlockPos cursor = targetPos;
+
+			while (world.getBlockState(cursor).isOf(ModBlocks.WATER_LAYER)) {
+				cursor = cursor.up();
+			}
+
+			BlockState aboveState = world.getBlockState(cursor);
+
+			if (isReplaceableForWater(aboveState)) {
+				return cursor;
+			} else {
+				return null;
+			}
+		}
+
+		if (isReplaceableForWater(targetState)) {
+			return targetPos;
+		}
+
+		return null;
 	}
+
+	private boolean isReplaceableForWater(BlockState state) {
+		return state.isAir() || state.isOf(ModBlocks.WATER_LAYER);
+	}
+
 }
