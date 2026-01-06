@@ -10,7 +10,6 @@ import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
-import javax.swing.plaf.synth.Region;
 import java.util.HashMap;
 import java.util.HashSet;
 

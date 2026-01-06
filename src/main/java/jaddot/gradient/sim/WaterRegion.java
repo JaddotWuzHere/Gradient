@@ -3,7 +3,6 @@ package jaddot.gradient.sim;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Queue;
-import java.util.Set;
 
 import static jaddot.gradient.Gradient.LOGGER;
 
@@ -218,6 +217,51 @@ public class WaterRegion {
             int worldCy = originY + c.y;
             int worldCz = originZ + c.z;
 
+            // vertical down neighbor
+            int downX = c.x;
+            int downY = c.y - 1;
+            int downZ = c.z;
+
+            if (downY >= 0 && downY < sizeY) {
+                // in bounds
+                Cell down = new Cell(downX, downY, downZ);
+
+                int t = computeTransfer(c, down);
+                if (t != 0) {
+                    int worldNx = originX + downX;
+                    int worldNy = originY + downY;
+                    int worldNz = originZ + downZ;
+
+                    sink.add(worldCx, worldCy, worldCz, -t);
+                    sink.add(worldNx, worldNy, worldNz, +t);
+
+                    touched.add(c);
+                    touched.add(down);
+                    continue;
+                }
+            } else {
+                // oob
+                int outLevel = levels[c.x][c.y][c.z];
+
+                if (outLevel > 0) {
+                    int worldNx = worldCx;
+                    int worldNy = worldCy - 1;
+                    int worldNz = worldCz;
+
+                    int inLevel = query.getLevelAt(worldNx, worldNy, worldNz);
+                    boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
+
+                    int t = computeVerticalAmount(outLevel, inLevel, inSolid);
+                    if (t != 0) {
+                        sink.add(worldCx, worldCy, worldCz, -t);
+                        sink.add(worldNx, worldNy, worldNz, t);
+
+                        touched.add(c);
+                        continue;
+                    }
+                }
+            }
+
             // horizontal cardinal neighbors in region only
             for (int[] off : CARDINAL_OFFSETS) {
                 int nx = c.x + off[0];
@@ -246,59 +290,6 @@ public class WaterRegion {
                     touched.add(n);
                 }
             }
-
-            // vertical down neighbor
-            int downX = c.x;
-            int downY = c.y - 1;
-            int downZ = c.z;
-
-            if (downY >= 0 && downY < sizeY) {
-                // in bounds
-                Cell down = new Cell(downX, downY, downZ);
-
-                int t = computeTransfer(c, down);
-                if (t != 0) {
-                    int worldNx = originX + downX;
-                    int worldNy = originY + downY;
-                    int worldNz = originZ + downZ;
-
-                    sink.add(worldCx, worldCy, worldCz, -t);
-                    sink.add(worldNx, worldNy, worldNz, +t);
-
-                    touched.add(c);
-                    touched.add(down);
-                }
-            } else {
-                // oob
-                int outLevel = levels[c.x][c.y][c.z];
-                if (outLevel <= 0) continue;
-
-                int worldNx = worldCx;
-                int worldNy = worldCy - 1;
-                int worldNz = worldCz;
-
-                int inLevel = query.getLevelAt(worldNx, worldNy, worldNz);
-                boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
-
-                if (inSolid) continue;
-
-                int capacity = MAX_LEVEL - inLevel;
-                if (capacity <= 0) continue;
-
-                int t = Math.min(outLevel, capacity);
-                t = Math.min(t, MAX_DOWNWARD_MOVEMENT);
-                if (t <= 0) continue;
-
-                sink.add(worldCx, worldCy, worldCz, -t);
-                sink.add(worldNx, worldNy, worldNz, t);
-
-                touched.add(c);
-            }
-        }
-
-        if (touched.isEmpty()) {
-            currentActive.clear();
-            return false;
         }
 
         for (Cell c : touched) {
@@ -365,15 +356,18 @@ public class WaterRegion {
     }
 
     // helpers
+
     int computeVerticalTransfer(Cell out, Cell in) {
         int outLevel = levels[out.x][out.y][out.z];
         int inLevel  = levels[in.x][in.y][in.z];
         boolean inSolid = solids[in.x][in.y][in.z];
 
+        return computeVerticalAmount(outLevel, inLevel, inSolid);
+    }
+
+    int computeVerticalAmount(int outLevel, int inLevel, boolean inSolid) {
         if (outLevel <= 0) return 0;
-        if (inSolid) {
-            return 0;
-        }
+        if (inSolid) return 0;
 
         int capacity = MAX_LEVEL - inLevel;
         if (capacity <= 0) return 0;
