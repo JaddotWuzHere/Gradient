@@ -9,7 +9,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 public class WaterHooks {
-    public static void onRedstonePlaced(ServerWorld world, BlockPos pos) {
+    public static void onWaterPlaced(ServerWorld world, BlockPos pos) {
         WaterRegionManager manager = getManager(world);
         manager.injectWater(world, pos);
     }
