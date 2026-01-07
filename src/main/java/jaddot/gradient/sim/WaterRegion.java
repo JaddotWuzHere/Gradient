@@ -27,6 +27,17 @@ public class WaterRegion {
 
     private static final Random rand = new Random(67L);
 
+    private static final int[][] ALL_OFFSETS = {
+            { 1, 0, 0 },
+            {-1, 0, 0 },
+            { 0, 0, 1 },
+            { 0, 0,-1 },
+            { 1, 0, 1 },
+            { 1, 0,-1 },
+            {-1, 0, 1 },
+            {-1, 0,-1 }
+    };
+
     private static final int[][] CARDINAL_OFFSETS = {
             { 1, 0, 0 },
             {-1, 0, 0 },
@@ -328,19 +339,42 @@ public class WaterRegion {
         int centerLevel = levels[cx][cy][cz];
         if (centerLevel <= 0) return;
 
-        Cell[] neighbors = new Cell[4];
-        int[] neighLevels = new int[4];
+        Cell[] neighbors = new Cell[8];
+        int[] neighLevels = new int[8];
         int count = 0;
 
-        for (int[] off : CARDINAL_OFFSETS) {
+        for (int[] off : ALL_OFFSETS) {
+            int dx = off[0];
+            int dz = off[2];
+
             int nx = cx + off[0];
             int ny = cy;
             int nz = cz + off[2];
 
             if (nx < 0 || nx >= sizeX ||
-                    ny < 0 || ny >= sizeY ||
-                    nz < 0 || nz >= sizeZ) {
+                ny < 0 || ny >= sizeY ||
+                nz < 0 || nz >= sizeZ) {
                 continue;
+            }
+
+            // diagonal corner prevention
+            if (Math.abs(dx) == 1 && Math.abs(dz) == 1) {
+                int ax = cx + dx;
+                int ay = cy;
+                int az = cz;
+
+                int bx = cx;
+                int by = cy;
+                int bz = cz + dz;
+
+                if (ax < 0 || ax >= sizeX || az < 0 || az >= sizeZ ||
+                        bx < 0 || bx >= sizeX || bz < 0 || bz >= sizeZ) {
+                    continue;
+                }
+
+                if (solids[ax][ay][az] && solids[bx][by][bz]) {
+                    continue;
+                }
             }
 
             if (solids[nx][ny][nz]) continue;
