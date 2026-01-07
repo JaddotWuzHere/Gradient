@@ -241,8 +241,11 @@ public class WaterRegion {
             return;
         }
 
-        // horizontal
+        // horizontal in region
         tryHorizontalNeighborsInRegion(c, worldCx, worldCy, worldCz, sink);
+
+        // horizontal oob
+        // TODO
     }
 
     // helpers
@@ -258,7 +261,12 @@ public class WaterRegion {
         }
 
         Cell down = new Cell(downX, downY, downZ);
-        int t = computeVerticalTransfer(c, down);
+
+        int outLevel = levels[c.x][c.y][c.z];
+        int inLevel  = levels[down.x][down.y][down.z];
+        boolean inSolid = solids[down.x][down.y][down.z];
+
+        int t = computeVerticalTransfer(outLevel, inLevel, inSolid);
         if (t == 0) return false;
 
         int worldNx = originX + downX;
@@ -285,7 +293,7 @@ public class WaterRegion {
         int inLevel  = query.getLevelAt(worldNx, worldNy, worldNz);
         boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
 
-        int t = computeVerticalAmount(outLevel, inLevel, inSolid);
+        int t = computeVerticalTransfer(outLevel, inLevel, inSolid);
         if (t == 0) return false;
 
         moveWater(worldCx, worldCy, worldCz,
@@ -294,15 +302,7 @@ public class WaterRegion {
         return true;
     }
 
-    int computeVerticalTransfer(Cell out, Cell in) {
-        int outLevel = levels[out.x][out.y][out.z];
-        int inLevel  = levels[in.x][in.y][in.z];
-        boolean inSolid = solids[in.x][in.y][in.z];
-
-        return computeVerticalAmount(outLevel, inLevel, inSolid);
-    }
-
-    int computeVerticalAmount(int outLevel, int inLevel, boolean inSolid) {
+    int computeVerticalTransfer(int outLevel, int inLevel, boolean inSolid) {
         if (outLevel <= 0) return 0;
         if (inSolid) return 0;
 
