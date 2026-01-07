@@ -197,8 +197,7 @@ public class WaterRegion {
         return any;
     }
 
-    public boolean step(WaterDeltaSink sink, WaterQuery query) {
-
+    public boolean step(WaterDeltaSink sink, WaterQuery query, WaterActivation activation) {
         boolean hadInDelta = applyDeltasAndSeedActive();
 
         if (currentActive.isEmpty()) {
@@ -206,100 +205,172 @@ public class WaterRegion {
         }
 
         Queue<Cell> nextActive = new ArrayDeque<>();
-
         touched.clear();
 
         while (!currentActive.isEmpty()) {
             Cell c = currentActive.remove();
             activeCells[c.x][c.y][c.z] = false;
 
-            int worldCx = originX + c.x;
-            int worldCy = originY + c.y;
-            int worldCz = originZ + c.z;
-
-            // vertical down neighbor
-            int downX = c.x;
-            int downY = c.y - 1;
-            int downZ = c.z;
-
-            if (downY >= 0 && downY < sizeY) {
-                // in bounds
-                Cell down = new Cell(downX, downY, downZ);
-
-                int t = computeTransfer(c, down);
-                if (t != 0) {
-                    int worldNx = originX + downX;
-                    int worldNy = originY + downY;
-                    int worldNz = originZ + downZ;
-
-                    sink.add(worldCx, worldCy, worldCz, -t);
-                    sink.add(worldNx, worldNy, worldNz, +t);
-
-                    touched.add(c);
-                    touched.add(down);
-                    continue;
-                }
-            } else {
-                // oob
-                int outLevel = levels[c.x][c.y][c.z];
-
-                if (outLevel > 0) {
-                    int worldNx = worldCx;
-                    int worldNy = worldCy - 1;
-                    int worldNz = worldCz;
-
-                    int inLevel = query.getLevelAt(worldNx, worldNy, worldNz);
-                    boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
-
-                    int t = computeVerticalAmount(outLevel, inLevel, inSolid);
-                    if (t != 0) {
-                        sink.add(worldCx, worldCy, worldCz, -t);
-                        sink.add(worldNx, worldNy, worldNz, t);
-
-                        touched.add(c);
-                        continue;
-                    }
-                }
-            }
-
-            // horizontal cardinal neighbors in region only
-            for (int[] off : CARDINAL_OFFSETS) {
-                int nx = c.x + off[0];
-                int ny = c.y;
-                int nz = c.z + off[2];
-
-                // ignore oob horizontals for now
-                if (nx < 0 || nx >= sizeX ||
-                        ny < 0 || ny >= sizeY ||
-                        nz < 0 || nz >= sizeZ) {
-                    continue;
-                }
-
-                Cell n = new Cell(nx, ny, nz);
-
-                int t = computeTransfer(c, n);
-                if (t != 0) {
-                    int worldNx = originX + nx;
-                    int worldNy = originY + ny;
-                    int worldNz = originZ + nz;
-
-                    sink.add(worldCx, worldCy, worldCz, -t);
-                    sink.add(worldNx, worldNy, worldNz, +t);
-
-                    touched.add(c);
-                    touched.add(n);
-                }
-            }
+            processCell(c, sink, query);
         }
 
+        seedNextActiveFromTouched(nextActive, activation);
+
+        currentActive = nextActive;
+        return !currentActive.isEmpty();
+    }
+
+
+    /* -------------------------------------------- */
+    /*               actual water alg               */
+    /* -------------------------------------------- */
+
+    // main alg
+    private void processCell(Cell c, WaterDeltaSink sink, WaterQuery query) {
+        int worldCx = originX + c.x;
+        int worldCy = originY + c.y;
+        int worldCz = originZ + c.z;
+
+        // vertical in region
+        if (tryVerticalDownInRegion(c, worldCx, worldCy, worldCz, sink)) {
+            return;
+        }
+
+        // vertical oob
+        if (tryVerticalDownOutOfRegion(c, worldCx, worldCy, worldCz, sink, query)) {
+            return;
+        }
+
+        // horizontal
+        tryHorizontalNeighborsInRegion(c, worldCx, worldCy, worldCz, sink);
+    }
+
+    // helpers
+    private boolean tryVerticalDownInRegion(
+            Cell c, int worldCx, int worldCy, int worldCz, WaterDeltaSink sink
+    ) {
+        int downX = c.x;
+        int downY = c.y - 1;
+        int downZ = c.z;
+
+        if (downY < 0 || downY >= sizeY) {
+            return false;
+        }
+
+        Cell down = new Cell(downX, downY, downZ);
+        int t = computeVerticalTransfer(c, down);
+        if (t == 0) return false;
+
+        int worldNx = originX + downX;
+        int worldNy = originY + downY;
+        int worldNz = originZ + downZ;
+
+        moveWater(worldCx, worldCy, worldCz,
+                worldNx, worldNy, worldNz,
+                t, c, down, sink);
+        return true;
+    }
+
+    private boolean tryVerticalDownOutOfRegion(
+            Cell c, int worldCx, int worldCy, int worldCz,
+            WaterDeltaSink sink, WaterQuery query
+    ) {
+        int outLevel = levels[c.x][c.y][c.z];
+        if (outLevel <= 0) return false;
+
+        int worldNx = worldCx;
+        int worldNy = worldCy - 1;
+        int worldNz = worldCz;
+
+        int inLevel  = query.getLevelAt(worldNx, worldNy, worldNz);
+        boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
+
+        int t = computeVerticalAmount(outLevel, inLevel, inSolid);
+        if (t == 0) return false;
+
+        moveWater(worldCx, worldCy, worldCz,
+                worldNx, worldNy, worldNz,
+                t, c, null, sink);
+        return true;
+    }
+
+    int computeVerticalTransfer(Cell out, Cell in) {
+        int outLevel = levels[out.x][out.y][out.z];
+        int inLevel  = levels[in.x][in.y][in.z];
+        boolean inSolid = solids[in.x][in.y][in.z];
+
+        return computeVerticalAmount(outLevel, inLevel, inSolid);
+    }
+
+    int computeVerticalAmount(int outLevel, int inLevel, boolean inSolid) {
+        if (outLevel <= 0) return 0;
+        if (inSolid) return 0;
+
+        int capacity = MAX_LEVEL - inLevel;
+        if (capacity <= 0) return 0;
+
+        int t = Math.min(outLevel, capacity);
+        t = Math.min(t, MAX_DOWNWARD_MOVEMENT);
+
+        return t;
+    }
+
+    private void tryHorizontalNeighborsInRegion(
+            Cell c, int worldCx, int worldCy, int worldCz, WaterDeltaSink sink
+    ) {
+        for (int[] off : CARDINAL_OFFSETS) {
+            int nx = c.x + off[0];
+            int ny = c.y;
+            int nz = c.z + off[2];
+
+            if (nx < 0 || nx >= sizeX ||
+                    ny < 0 || ny >= sizeY ||
+                    nz < 0 || nz >= sizeZ) {
+                continue;
+            }
+
+            Cell n = new Cell(nx, ny, nz);
+            int t = computeHorizontalTransfer(c, n);
+            if (t == 0) continue;
+
+            int worldNx = originX + nx;
+            int worldNy = originY + ny;
+            int worldNz = originZ + nz;
+
+            moveWater(worldCx, worldCy, worldCz,
+                    worldNx, worldNy, worldNz,
+                    t, c, n, sink);
+        }
+    }
+
+    int computeHorizontalTransfer(Cell out, Cell in) {
+        return 0;
+    }
+
+    private void moveWater(
+            int worldFx, int worldFy, int worldFz,
+            int worldTx, int worldTy, int worldTz,
+            int amount,
+            Cell fromCell, Cell toCellOrNull,
+            WaterDeltaSink sink
+    ) {
+        sink.add(worldFx, worldFy, worldFz, -amount);
+        sink.add(worldTx, worldTy, worldTz, +amount);
+
+        touched.add(fromCell);
+        if (toCellOrNull != null) {
+            touched.add(toCellOrNull);
+        }
+    }
+
+    private void seedNextActiveFromTouched(Queue<Cell> nextActive, WaterActivation activation) {
         for (Cell c : touched) {
-            // itself
             if (!activeCells[c.x][c.y][c.z]) {
                 activeCells[c.x][c.y][c.z] = true;
                 nextActive.add(c);
             }
 
-            // horizontal cardinal neighbors
+            // horizontal neighbors
             for (int[] off : CARDINAL_OFFSETS) {
                 int nx = c.x + off[0];
                 int ny = c.y;
@@ -323,7 +394,12 @@ public class WaterRegion {
                 int ny = c.y + off[1];
                 int nz = c.z;
 
+                int worldNx = originX + nx;
+                int worldNy = originY + ny;
+                int worldNz = originZ + nz;
+
                 if (ny < 0 || ny >= sizeY) {
+                    activation.markActiveAt(worldNx, worldNy, worldNz);
                     continue;
                 }
 
@@ -333,65 +409,5 @@ public class WaterRegion {
                 }
             }
         }
-
-        currentActive = nextActive;
-        return !currentActive.isEmpty();
     }
-
-    /* -------------------------------------------- */
-    /*               actual water alg               */
-    /* -------------------------------------------- */
-
-    // main alg
-    public int computeTransfer(Cell out, Cell in) {
-        if (isVerticalDown(out, in)) {
-            return computeVerticalTransfer(out, in);
-        } else if (isHorizontal(out, in)) {
-            return computeHorizontalTransfer(out, in);
-        } else {
-            // some weird shit happened, don't change
-            LOGGER.info("what the fuck");
-            return 0;
-        }
-    }
-
-    // helpers
-
-    int computeVerticalTransfer(Cell out, Cell in) {
-        int outLevel = levels[out.x][out.y][out.z];
-        int inLevel  = levels[in.x][in.y][in.z];
-        boolean inSolid = solids[in.x][in.y][in.z];
-
-        return computeVerticalAmount(outLevel, inLevel, inSolid);
-    }
-
-    int computeVerticalAmount(int outLevel, int inLevel, boolean inSolid) {
-        if (outLevel <= 0) return 0;
-        if (inSolid) return 0;
-
-        int capacity = MAX_LEVEL - inLevel;
-        if (capacity <= 0) return 0;
-
-        int t = Math.min(outLevel, capacity);
-        t = Math.min(t, MAX_DOWNWARD_MOVEMENT);
-
-        return t;
-    }
-
-    int computeHorizontalTransfer(Cell out, Cell in) {
-        // TODO
-        return 0; //placeholder
-    }
-
-    boolean isVerticalDown(Cell out, Cell in) {
-        return out.x == in.x &&
-               out.z == in.z &&
-               out.y == in.y + 1;
-    }
-
-    boolean isHorizontal(Cell out, Cell in) {
-        return (out.x != in.x || out.z != in.z) &&
-                out.y == in.y;
-    }
-
 }

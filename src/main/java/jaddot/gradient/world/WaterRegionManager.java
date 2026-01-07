@@ -1,10 +1,7 @@
 package jaddot.gradient.world;
 
 import jaddot.gradient.ModBlocks;
-import jaddot.gradient.sim.WaterDeltaSink;
-import jaddot.gradient.sim.WaterQuery;
-import jaddot.gradient.sim.WaterRegion;
-import jaddot.gradient.sim.WaterSimState;
+import jaddot.gradient.sim.*;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
@@ -13,7 +10,7 @@ import net.minecraft.util.math.BlockPos;
 import java.util.HashMap;
 import java.util.HashSet;
 
-public class WaterRegionManager implements WaterDeltaSink, WaterQuery {
+public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActivation {
     private final int REGION_SIZE_X = 16;
     private final int REGION_SIZE_Y = 16;
     private final int REGION_SIZE_Z = 16;
@@ -260,6 +257,19 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery {
         activeRegions.add(key);
     }
 
+    @Override
+    public void markActiveAt(int worldX, int worldY, int worldZ) {
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        WaterRegion region = getOrCreateRegion(key);
+
+        int localX = Math.floorMod(worldX, REGION_SIZE_X);
+        int localY = Math.floorMod(worldY, REGION_SIZE_Y);
+        int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
+
+        region.markCellActive(localX, localY, localZ);
+        activeRegions.add(key);
+    }
+
     /* -------------------------------------------- */
     /*                   nbt shit                   */
     /* -------------------------------------------- */
@@ -288,7 +298,7 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery {
 
             syncSolids(world, rKey, region);
 
-            boolean stillActive = region.step(this, this);
+            boolean stillActive = region.step(this, this, this);
 
             BlockPos origin = getRegionOrigin(rKey);
             for (int x = 0; x < REGION_SIZE_X; x++) {
