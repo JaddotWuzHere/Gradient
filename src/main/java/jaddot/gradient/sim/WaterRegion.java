@@ -10,12 +10,12 @@ import static jaddot.gradient.Gradient.LOGGER;
 public class WaterRegion {
 
     public static final int MAX_LEVEL = 16;
-    public static final int MAX_DOWNWARD_MOVEMENT = 3;
+    public static final int MAX_DOWNWARD_MOVEMENT = 4;
 
     private final int originX, originY, originZ;
     private final int sizeX, sizeY, sizeZ;
     private final int[][][] levels;
-    private int[][][] deltas;
+    private final int[][][] deltas;
 
     private final boolean[][][] solids;
 
@@ -87,10 +87,6 @@ public class WaterRegion {
 
     public void setSolid(int x, int y, int z, boolean value) {
         solids[x][y][z] = value;
-    }
-
-    public int getDelta(int x, int y, int z) {
-        return deltas[x][y][z];
     }
 
     public void addDelta(int x, int y, int z, int value) {
@@ -245,57 +241,20 @@ public class WaterRegion {
         int worldCy = originY + c.y;
         int worldCz = originZ + c.z;
 
-        // vertical in region
-        if (tryVerticalDownInRegion(c, worldCx, worldCy, worldCz, sink)) {
+        if (tryVerticalDown(c, worldCx, worldCy, worldCz, sink, query)) {
             return;
         }
 
-        // vertical oob
-        if (tryVerticalDownOutOfRegion(c, worldCx, worldCy, worldCz, sink, query)) {
-            return;
-        }
-
-        // horizontal in region
-        tryHorizontalNeighborsInRegion(c, worldCx, worldCy, worldCz, sink);
-
-        // horizontal oob
-        // TODO
+        tryHorizontalNeighbors(c, worldCx, worldCy, worldCz, sink, query);
     }
 
     // helpers
-    private boolean tryVerticalDownInRegion(
-            Cell c, int worldCx, int worldCy, int worldCz, WaterDeltaSink sink
-    ) {
-        int downX = c.x;
-        int downY = c.y - 1;
-        int downZ = c.z;
 
-        if (downY < 0 || downY >= sizeY) {
-            return false;
-        }
-
-        Cell down = new Cell(downX, downY, downZ);
-
-        int outLevel = levels[c.x][c.y][c.z];
-        int inLevel  = levels[down.x][down.y][down.z];
-        boolean inSolid = solids[down.x][down.y][down.z];
-
-        int t = computeVerticalTransfer(outLevel, inLevel, inSolid);
-        if (t == 0) return false;
-
-        int worldNx = originX + downX;
-        int worldNy = originY + downY;
-        int worldNz = originZ + downZ;
-
-        moveWater(worldCx, worldCy, worldCz,
-                worldNx, worldNy, worldNz,
-                t, c, down, sink);
-        return true;
-    }
-
-    private boolean tryVerticalDownOutOfRegion(
-            Cell c, int worldCx, int worldCy, int worldCz,
-            WaterDeltaSink sink, WaterQuery query
+    private boolean tryVerticalDown(
+            Cell c,
+            int worldCx, int worldCy, int worldCz,
+            WaterDeltaSink sink,
+            WaterQuery query
     ) {
         int outLevel = levels[c.x][c.y][c.z];
         if (outLevel <= 0) return false;
@@ -312,9 +271,10 @@ public class WaterRegion {
 
         moveWater(worldCx, worldCy, worldCz,
                 worldNx, worldNy, worldNz,
-                t, c, null, sink);
+                t, c, sink);
         return true;
     }
+
 
     int computeVerticalTransfer(int outLevel, int inLevel, boolean inSolid) {
         if (outLevel <= 0) return 0;
@@ -329,8 +289,11 @@ public class WaterRegion {
         return t;
     }
 
-    private void tryHorizontalNeighborsInRegion(
-            Cell c, int worldCx, int worldCy, int worldCz, WaterDeltaSink sink
+    private void tryHorizontalNeighbors(
+            Cell c,
+            int worldCx, int worldCy, int worldCz,
+            WaterDeltaSink sink,
+            WaterQuery query
     ) {
         int cx = c.x;
         int cy = c.y;
@@ -339,7 +302,9 @@ public class WaterRegion {
         int centerLevel = levels[cx][cy][cz];
         if (centerLevel <= 0) return;
 
-        Cell[] neighbors = new Cell[8];
+        int[] wx = new int[8];
+        int[] wy = new int[8];
+        int[] wz = new int[8];
         int[] neighLevels = new int[8];
         int count = 0;
 
@@ -347,43 +312,38 @@ public class WaterRegion {
             int dx = off[0];
             int dz = off[2];
 
-            int nx = cx + off[0];
-            int ny = cy;
-            int nz = cz + off[2];
+            int worldNx = worldCx + dx;
+            int worldNy = worldCy;
+            int worldNz = worldCz + dz;
 
-            if (nx < 0 || nx >= sizeX ||
-                ny < 0 || ny >= sizeY ||
-                nz < 0 || nz >= sizeZ) {
+            // corner blocking
+            if (Math.abs(dx) == 1 && Math.abs(dz) == 1) {
+                int ax = worldCx + dx;
+                int ay = worldCy;
+                int az = worldCz;
+
+                int bx = worldCx;
+                int by = worldCy;
+                int bz = worldCz + dz;
+
+                if (query.isSolidAt(ax, ay, az) && query.isSolidAt(bx, by, bz)) {
+                    continue;
+                }
+            }
+
+            if (query.isSolidAt(worldNx, worldNy, worldNz)) {
                 continue;
             }
 
-            // diagonal corner prevention
-            if (Math.abs(dx) == 1 && Math.abs(dz) == 1) {
-                int ax = cx + dx;
-                int ay = cy;
-                int az = cz;
-
-                int bx = cx;
-                int by = cy;
-                int bz = cz + dz;
-
-                if (ax < 0 || ax >= sizeX || az < 0 || az >= sizeZ ||
-                        bx < 0 || bx >= sizeX || bz < 0 || bz >= sizeZ) {
-                    continue;
-                }
-
-                if (solids[ax][ay][az] && solids[bx][by][bz]) {
-                    continue;
-                }
+            int nLevel = query.getLevelAt(worldNx, worldNy, worldNz);
+            if (nLevel >= MAX_LEVEL) {
+                continue;
             }
 
-            if (solids[nx][ny][nz]) continue;
-
-            int lvl = levels[nx][ny][nz];
-            if (lvl >= MAX_LEVEL) continue;
-
-            neighbors[count] = new Cell(nx, ny, nz);
-            neighLevels[count] = lvl;
+            wx[count] = worldNx;
+            wy[count] = worldNy;
+            wz[count] = worldNz;
+            neighLevels[count] = nLevel;
             count++;
         }
 
@@ -391,13 +351,12 @@ public class WaterRegion {
 
         for (int i = count - 1; i > 0; i--) {
             int j = rand.nextInt(i + 1);
-            Cell tmpC = neighbors[i];
-            neighbors[i] = neighbors[j];
-            neighbors[j] = tmpC;
 
-            int tmpL = neighLevels[i];
-            neighLevels[i] = neighLevels[j];
-            neighLevels[j] = tmpL;
+            int tmpX = wx[i]; wx[i] = wx[j]; wx[j] = tmpX;
+            int tmpY = wy[i]; wy[i] = wy[j]; wy[j] = tmpY;
+            int tmpZ = wz[i]; wz[i] = wz[j]; wz[j] = tmpZ;
+
+            int tmpL = neighLevels[i]; neighLevels[i] = neighLevels[j]; neighLevels[j] = tmpL;
         }
 
         // smoothing
@@ -418,14 +377,13 @@ public class WaterRegion {
             nLevel++;
             neighLevels[i] = nLevel;
 
-            Cell n = neighbors[i];
-            int worldNx = originX + n.x;
-            int worldNy = originY + n.y;
-            int worldNz = originZ + n.z;
+            int worldNx = wx[i];
+            int worldNy = wy[i];
+            int worldNz = wz[i];
 
             moveWater(worldCx, worldCy, worldCz,
                     worldNx, worldNy, worldNz,
-                    1, c, n, sink);
+                    1, c, sink);
         }
     }
 
@@ -433,16 +391,13 @@ public class WaterRegion {
             int worldFx, int worldFy, int worldFz,
             int worldTx, int worldTy, int worldTz,
             int amount,
-            Cell fromCell, Cell toCellOrNull,
+            Cell fromCell,
             WaterDeltaSink sink
     ) {
         sink.add(worldFx, worldFy, worldFz, -amount);
         sink.add(worldTx, worldTy, worldTz, +amount);
 
         touched.add(fromCell);
-        if (toCellOrNull != null) {
-            touched.add(toCellOrNull);
-        }
     }
 
     private void seedNextActiveFromTouched(Queue<Cell> nextActive, WaterActivation activation) {
