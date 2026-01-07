@@ -3,6 +3,7 @@ package jaddot.gradient.sim;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Queue;
+import java.util.Random;
 
 import static jaddot.gradient.Gradient.LOGGER;
 
@@ -23,6 +24,8 @@ public class WaterRegion {
     private Queue<Cell> currentActive;
 
     private final HashSet<Cell> touched = new HashSet<>();
+
+    private static final Random rand = new Random(67L);
 
     private static final int[][] CARDINAL_OFFSETS = {
             { 1, 0, 0 },
@@ -318,10 +321,21 @@ public class WaterRegion {
     private void tryHorizontalNeighborsInRegion(
             Cell c, int worldCx, int worldCy, int worldCz, WaterDeltaSink sink
     ) {
+        int cx = c.x;
+        int cy = c.y;
+        int cz = c.z;
+
+        int centerLevel = levels[cx][cy][cz];
+        if (centerLevel <= 0) return;
+
+        Cell[] neighbors = new Cell[4];
+        int[] neighLevels = new int[4];
+        int count = 0;
+
         for (int[] off : CARDINAL_OFFSETS) {
-            int nx = c.x + off[0];
-            int ny = c.y;
-            int nz = c.z + off[2];
+            int nx = cx + off[0];
+            int ny = cy;
+            int nz = cz + off[2];
 
             if (nx < 0 || nx >= sizeX ||
                     ny < 0 || ny >= sizeY ||
@@ -329,22 +343,56 @@ public class WaterRegion {
                 continue;
             }
 
-            Cell n = new Cell(nx, ny, nz);
-            int t = computeHorizontalTransfer(c, n);
-            if (t == 0) continue;
+            if (solids[nx][ny][nz]) continue;
 
-            int worldNx = originX + nx;
-            int worldNy = originY + ny;
-            int worldNz = originZ + nz;
+            int lvl = levels[nx][ny][nz];
+            if (lvl >= MAX_LEVEL) continue;
+
+            neighbors[count] = new Cell(nx, ny, nz);
+            neighLevels[count] = lvl;
+            count++;
+        }
+
+        if (count == 0) return;
+
+        for (int i = count - 1; i > 0; i--) {
+            int j = rand.nextInt(i + 1);
+            Cell tmpC = neighbors[i];
+            neighbors[i] = neighbors[j];
+            neighbors[j] = tmpC;
+
+            int tmpL = neighLevels[i];
+            neighLevels[i] = neighLevels[j];
+            neighLevels[j] = tmpL;
+        }
+
+        // smoothing
+        for (int i = 0; i < count; i++) {
+            if (centerLevel <= 0) break;
+
+            int nLevel = neighLevels[i];
+
+            if (centerLevel - nLevel < 2) {
+                continue;
+            }
+
+            if (nLevel + 1 > MAX_LEVEL) {
+                continue;
+            }
+
+            centerLevel--;
+            nLevel++;
+            neighLevels[i] = nLevel;
+
+            Cell n = neighbors[i];
+            int worldNx = originX + n.x;
+            int worldNy = originY + n.y;
+            int worldNz = originZ + n.z;
 
             moveWater(worldCx, worldCy, worldCz,
                     worldNx, worldNy, worldNz,
-                    t, c, n, sink);
+                    1, c, n, sink);
         }
-    }
-
-    int computeHorizontalTransfer(Cell out, Cell in) {
-        return 0;
     }
 
     private void moveWater(
