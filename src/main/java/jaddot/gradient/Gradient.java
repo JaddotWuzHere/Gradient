@@ -104,38 +104,17 @@ public class Gradient implements ModInitializer {
 		BlockPos hitPos = hitResult.getBlockPos();
 		Direction side = hitResult.getSide();
 
-		BlockState hitState = world.getBlockState(hitPos);
+		BlockPos placePos = isReplaceableForWater(world.getBlockState(hitPos))
+				? hitPos
+				: hitPos.offset(side);
 
-		BlockPos targetPos;
-		if (isReplaceableForWater(hitState)) {
-			targetPos = hitPos;
-		} else {
-			targetPos = hitPos.offset(side);
+		BlockState placeState = world.getBlockState(placePos);
+
+		if (placeState.isOf(ModBlocks.WATER_LAYER)) {
+			return placePos;
 		}
 
-		BlockState targetState = world.getBlockState(targetPos);
-
-		if (targetState.isOf(ModBlocks.WATER_LAYER)) {
-			BlockPos cursor = targetPos;
-
-			while (world.getBlockState(cursor).isOf(ModBlocks.WATER_LAYER)) {
-				cursor = cursor.up();
-			}
-
-			BlockState aboveState = world.getBlockState(cursor);
-
-			if (isReplaceableForWater(aboveState)) {
-				return cursor;
-			} else {
-				return null;
-			}
-		}
-
-		if (isReplaceableForWater(targetState)) {
-			return targetPos;
-		}
-
-		return null;
+		return isReplaceableForWater(placeState) ? placePos : null;
 	}
 
 	private boolean isReplaceableForWater(BlockState state) {
