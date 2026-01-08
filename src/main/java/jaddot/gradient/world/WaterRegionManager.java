@@ -162,21 +162,24 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
             int ly = pos.getY() - origin.getY();
             int lz = pos.getZ() - origin.getZ();
 
-            int currentLevel = region.getLevel(lx, ly, lz);
-            int capacity = WaterRegion.MAX_LEVEL - currentLevel;
+            int base = region.getLevel(lx, ly, lz);
+            int pending = region.getDelta(lx, ly, lz);
+            int effective = base + pending;
 
+            int capacity = WaterRegion.MAX_LEVEL - effective;
             if (capacity > 0) {
                 int usedHere = Math.min(remaining, capacity);
-                region.setLevel(lx, ly, lz, currentLevel + usedHere);
+
+                region.setLevel(lx, ly, lz, base + usedHere);
 
                 disturb(world, pos);
-
                 remaining -= usedHere;
             }
 
             pos = pos.up();
         }
     }
+
 
     public void removeWaterAt(ServerWorld world, BlockPos pos) {
         RegionKey rKey = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
@@ -236,8 +239,13 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
 
                     region.setSolid(x, y, z, isSolid);
 
-                    if (isSolid && region.getLevel(x, y, z) > 0) {
-                        region.setLevel(x, y, z, 0);
+                    if (isSolid) {
+                        if (region.getLevel(x, y, z) != 0) {
+                            region.setLevel(x, y, z, 0);
+                        }
+                        if (region.getDelta(x, y, z) != 0) {
+                            region.clearDelta(x, y, z);
+                        }
                     }
                 }
             }
@@ -246,6 +254,8 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
 
     @Override
     public void add(int worldX, int worldY, int worldZ, int amount) {
+        if (amount == 0) return;
+
         RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
         WaterRegion region = getOrCreateRegion(key);
 
@@ -253,7 +263,25 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
         int localY = Math.floorMod(worldY, REGION_SIZE_Y);
         int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
 
-        region.addDelta(localX, localY, localZ, amount);
+        int base = region.getLevel(localX, localY, localZ);
+        int pending = region.getDelta(localX, localY, localZ);
+        int effective = base + pending;
+
+        int safeAmount = amount;
+
+        if (amount > 0) {
+            int room = WaterRegion.MAX_LEVEL - effective;
+            if (room <= 0) return;
+            if (safeAmount > room) safeAmount = room;
+        } else {
+            if (effective <= 0) return;
+            int maxRemoval = -effective;
+            if (safeAmount < maxRemoval) safeAmount = maxRemoval;
+        }
+
+        if (safeAmount == 0) return;
+
+        region.addDelta(localX, localY, localZ, safeAmount);
         activeRegions.add(key);
     }
 
@@ -268,6 +296,27 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
 
         region.markCellActive(localX, localY, localZ);
         activeRegions.add(key);
+    }
+
+    @Override
+    public boolean isRegionLoadedAt(int worldX, int worldY, int worldZ) {
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        return regions.containsKey(key);
+    }
+
+    @Override
+    public int getEffectiveLevel(int worldX, int worldY, int worldZ) {
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        WaterRegion region = regions.get(key);
+
+        if (region == null) return 0;
+
+        int localX = Math.floorMod(worldX, REGION_SIZE_X);
+        int localY = Math.floorMod(worldY, REGION_SIZE_Y);
+        int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
+
+        return region.getLevel(localX, localY, localZ) +
+               region.getDelta(localX, localY, localZ);
     }
 
     /* -------------------------------------------- */
@@ -286,7 +335,7 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
 
     public void tick(ServerWorld world) {
         // simulation speed
-        if ((world.getTime() % 2L) != 0L) {
+        if ((world.getTime() % 1L) != 0L) {
             return;
         }
 

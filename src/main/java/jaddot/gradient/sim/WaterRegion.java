@@ -5,12 +5,11 @@ import java.util.HashSet;
 import java.util.Queue;
 import java.util.Random;
 
-import static jaddot.gradient.Gradient.LOGGER;
-
 public class WaterRegion {
 
     public static final int MAX_LEVEL = 16;
     public static final int MAX_DOWNWARD_MOVEMENT = 4;
+    public static final int SEEK = 2;
 
     private final int originX, originY, originZ;
     private final int sizeX, sizeY, sizeZ;
@@ -89,8 +88,20 @@ public class WaterRegion {
         solids[x][y][z] = value;
     }
 
+    public int getDelta(int x, int y, int z) {
+        return deltas[x][y][z];
+    }
+
     public void addDelta(int x, int y, int z, int value) {
         deltas[x][y][z] += value;
+    }
+
+    public void setDelta(int x, int y, int z, int value) {
+        deltas[x][y][z] = value;
+    }
+
+    public void clearDelta(int x, int y, int z) {
+        deltas[x][y][z] = 0;
     }
 
     /* -------------------------------------------- */
@@ -230,7 +241,6 @@ public class WaterRegion {
         return !currentActive.isEmpty();
     }
 
-
     /* -------------------------------------------- */
     /*               actual water alg               */
     /* -------------------------------------------- */
@@ -256,25 +266,23 @@ public class WaterRegion {
             WaterDeltaSink sink,
             WaterQuery query
     ) {
-        int outLevel = levels[c.x][c.y][c.z];
-        if (outLevel <= 0) return false;
+        int outEffectiveLevel = query.getEffectiveLevel(worldCx, worldCy, worldCz);
 
         int worldNx = worldCx;
         int worldNy = worldCy - 1;
         int worldNz = worldCz;
 
-        int inLevel  = query.getLevelAt(worldNx, worldNy, worldNz);
+        int inEffectiveLevel = query.getEffectiveLevel(worldNx, worldNy, worldNz);
         boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
 
-        int t = computeVerticalTransfer(outLevel, inLevel, inSolid);
+        int t = computeVerticalTransfer(outEffectiveLevel, inEffectiveLevel, inSolid);
         if (t == 0) return false;
 
         moveWater(worldCx, worldCy, worldCz,
                 worldNx, worldNy, worldNz,
-                t, c, sink);
+                t, c, sink, query);
         return true;
     }
-
 
     int computeVerticalTransfer(int outLevel, int inLevel, boolean inSolid) {
         if (outLevel <= 0) return 0;
@@ -295,11 +303,7 @@ public class WaterRegion {
             WaterDeltaSink sink,
             WaterQuery query
     ) {
-        int cx = c.x;
-        int cy = c.y;
-        int cz = c.z;
-
-        int centerLevel = levels[cx][cy][cz];
+        int centerLevel = query.getEffectiveLevel(worldCx, worldCy, worldCz);
         if (centerLevel <= 0) return;
 
         int[] wx = new int[8];
@@ -335,7 +339,7 @@ public class WaterRegion {
                 continue;
             }
 
-            int nLevel = query.getLevelAt(worldNx, worldNy, worldNz);
+            int nLevel = query.getEffectiveLevel(worldNx, worldNy, worldNz);
             if (nLevel >= MAX_LEVEL) {
                 continue;
             }
@@ -359,32 +363,60 @@ public class WaterRegion {
             int tmpL = neighLevels[i]; neighLevels[i] = neighLevels[j]; neighLevels[j] = tmpL;
         }
 
-        // smoothing
+        int centerDist = distToNearestLedge(worldCx, worldCy, worldCz, query);
+
+        // smoothing and seeking
         for (int i = 0; i < count; i++) {
             if (centerLevel <= 0) break;
 
             int nLevel = neighLevels[i];
+            int worldNx = wx[i];
+            int worldNy = wy[i];
+            int worldNz = wz[i];
 
-            if (centerLevel - nLevel < 2) {
-                continue;
-            }
+            int neighborDist = distToNearestLedge(worldNx, worldNy, worldNz, query);
 
-            if (nLevel + 1 > MAX_LEVEL) {
-                continue;
-            }
+            boolean steepEnough = (centerLevel - nLevel) >= 2;
+
+            boolean seeks = (neighborDist + 1 <= centerDist) && (centerLevel > nLevel);
+
+            if (!steepEnough && !seeks) continue;
+
+            if (nLevel + 1 > MAX_LEVEL) continue;
 
             centerLevel--;
             nLevel++;
             neighLevels[i] = nLevel;
 
-            int worldNx = wx[i];
-            int worldNy = wy[i];
-            int worldNz = wz[i];
-
             moveWater(worldCx, worldCy, worldCz,
                     worldNx, worldNy, worldNz,
-                    1, c, sink);
+                    1, c, sink, query);
         }
+    }
+
+    private int distToNearestLedge(int wx, int wy, int wz, WaterQuery query) {
+        int R = SEEK;
+        int best = Integer.MAX_VALUE;
+
+        for (int dx = -R; dx <= R; dx++) {
+            for (int dz = -R; dz <= R; dz++) {
+                int dist = Math.abs(dx) + Math.abs(dz);
+                if (dist > R) continue;
+
+                int x = wx + dx;
+                int z = wz + dz;
+
+                if (!query.isRegionLoadedAt(x, wy, z)) continue;
+                if (!query.isRegionLoadedAt(x, wy - 1, z)) continue;
+
+                if (!query.isSolidAt(x, wy, z) && !query.isSolidAt(x, wy - 1, z)) {
+                    if (dist < best) best = dist;
+                    if (best == 0) return 0;
+                }
+            }
+        }
+
+        return (best == Integer.MAX_VALUE) ? R + 1 : best;
     }
 
     private void moveWater(
@@ -392,12 +424,32 @@ public class WaterRegion {
             int worldTx, int worldTy, int worldTz,
             int amount,
             Cell fromCell,
-            WaterDeltaSink sink
+            WaterDeltaSink sink,
+            WaterQuery query
     ) {
-        sink.add(worldFx, worldFy, worldFz, -amount);
-        sink.add(worldTx, worldTy, worldTz, +amount);
+        int source      = query.getEffectiveLevel(worldFx, worldFy, worldFz);
+        int destination = query.getEffectiveLevel(worldTx, worldTy, worldTz);
 
-        touched.add(fromCell);
+        int destinationRoom = MAX_LEVEL - destination;
+        int safeAmount = Math.min(amount, source);
+        safeAmount = Math.min(safeAmount, destinationRoom);
+
+        if (safeAmount > 0) {
+            sink.add(worldFx, worldFy, worldFz, -safeAmount);
+            sink.add(worldTx, worldTy, worldTz, +safeAmount);
+
+            touched.add(fromCell);
+
+            int toLocalX = worldTx - originX;
+            int toLocalY = worldTy - originY;
+            int toLocalZ = worldTz - originZ;
+
+            if (0 <= toLocalX && toLocalX < sizeX &&
+                    0 <= toLocalY && toLocalY < sizeY &&
+                    0 <= toLocalZ && toLocalZ < sizeZ) {
+                touched.add(new Cell(toLocalX, toLocalY, toLocalZ));
+            }
+        }
     }
 
     private void seedNextActiveFromTouched(Queue<Cell> nextActive, WaterActivation activation) {
@@ -408,7 +460,7 @@ public class WaterRegion {
             }
 
             // horizontal neighbors
-            for (int[] off : CARDINAL_OFFSETS) {
+            for (int[] off : ALL_OFFSETS) {
                 int nx = c.x + off[0];
                 int ny = c.y;
                 int nz = c.z + off[2];
