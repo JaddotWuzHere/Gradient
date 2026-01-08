@@ -15,6 +15,9 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
     private final int REGION_SIZE_Y = 16;
     private final int REGION_SIZE_Z = 16;
 
+    private static final int SMOOTH_R = 1;
+    private static final int SMOOTH_STEPS = 2;
+
     private final HashMap<RegionKey, WaterRegion> regions;
     private final HashSet<RegionKey> activeRegions;
 
@@ -105,15 +108,14 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
     }
 
     // places water at pos, also adds a region if there isn't one there
-    public WaterRegion injectWater(ServerWorld world, BlockPos pos) {
-        int amount = 15;
+    public WaterRegion injectWater(ServerWorld world, BlockPos pos, int amount) {
         boolean canFit = canFitColumnAmount(world, pos, amount);
         if (!canFit) {
             RegionKey key = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
             return regions.get(key);
         }
 
-        applyColumnAmount(world, pos, amount);
+        applyColumnAmount(pos, amount);
 
         RegionKey key = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
         return getOrCreateRegion(key);
@@ -150,7 +152,7 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
         return true;
     }
 
-    private void applyColumnAmount(ServerWorld world, BlockPos pos, int amount) {
+    private void applyColumnAmount(BlockPos pos, int amount) {
         int remaining = amount;
 
         while (remaining > 0) {
@@ -172,7 +174,7 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
 
                 region.setLevel(lx, ly, lz, base + usedHere);
 
-                disturb(world, pos);
+                disturb(pos);
                 remaining -= usedHere;
             }
 
@@ -180,8 +182,195 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
         }
     }
 
+    public void onPlayerAddOneLevel(ServerWorld world, BlockPos pos) {
+        injectWater(world, pos, 1);
+        HashSet<BlockPos> touched = smoothLocalPulse(pos);
 
-    public void removeWaterAt(ServerWorld world, BlockPos pos) {
+        wakeAround(touched);
+    }
+
+    private HashSet<BlockPos> smoothLocalPulse(BlockPos center) {
+        int y = center.getY();
+        int R = SMOOTH_R;
+        int size = 2 * R + 1;
+
+        int[][] lvl = new int[size][size];
+        boolean[][] ok = new boolean[size][size];
+
+        for (int dx = -R; dx <= R; dx++) {
+            for (int dz = -R; dz <= R; dz++) {
+                int wx = center.getX() + dx;
+                int wz = center.getZ() + dz;
+                int ix = dx + R;
+                int iz = dz + R;
+
+                if (!isRegionLoadedAt(wx, y, wz)) {
+                    ok[ix][iz] = false;
+                    lvl[ix][iz] = 0;
+                    continue;
+                }
+
+                if (isSolidAt(wx, y, wz)) {
+                    ok[ix][iz] = false;
+                    lvl[ix][iz] = 0;
+                    continue;
+                }
+
+                ok[ix][iz] = true;
+                lvl[ix][iz] = getEffectiveLevel(wx, y, wz);
+            }
+        }
+
+        int[][] orig = new int[size][size];
+        for (int i = 0; i < size; i++) {
+            System.arraycopy(lvl[i], 0, orig[i], 0, size);
+        }
+
+        final int[][] DIRS4 = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+
+        for (int s = 0; s < SMOOTH_STEPS; s++) {
+            int[][] d = new int[size][size];
+
+            for (int ix = 0; ix < size; ix++) {
+                for (int iz = 0; iz < size; iz++) {
+                    if (!ok[ix][iz]) continue;
+                    int a = lvl[ix][iz];
+                    if (a <= 0) continue;
+
+                    int bestNx = -1, bestNz = -1;
+                    int bestVal = Integer.MAX_VALUE;
+
+                    for (int[] dir : DIRS4) {
+                        int nx = ix + dir[0];
+                        int nz = iz + dir[1];
+                        if (nx < 0 || nx >= size || nz < 0 || nz >= size) continue;
+                        if (!ok[nx][nz]) continue;
+
+                        int b = lvl[nx][nz];
+                        if (b < bestVal) {
+                            bestVal = b;
+                            bestNx = nx;
+                            bestNz = nz;
+                        }
+                    }
+
+                    if (bestNx == -1) continue;
+
+                    if (a - bestVal >= 1 && bestVal < WaterRegion.MAX_LEVEL) {
+                        d[ix][iz] -= 1;
+                        d[bestNx][bestNz] += 1;
+                    }
+                }
+            }
+
+            boolean any = false;
+            for (int ix = 0; ix < size; ix++) {
+                for (int iz = 0; iz < size; iz++) {
+                    int delta = d[ix][iz];
+                    if (delta == 0) continue;
+
+                    int v = lvl[ix][iz] + delta;
+                    if (v < 0) v = 0;
+                    if (v > WaterRegion.MAX_LEVEL) v = WaterRegion.MAX_LEVEL;
+
+                    if (v != lvl[ix][iz]) {
+                        lvl[ix][iz] = v;
+                        any = true;
+                    }
+                }
+            }
+
+            if (!any) break;
+        }
+
+        HashSet<BlockPos> touched = new HashSet<>();
+
+        for (int dx = -R; dx <= R; dx++) {
+            for (int dz = -R; dz <= R; dz++) {
+                int ix = dx + R;
+                int iz = dz + R;
+                if (!ok[ix][iz]) continue;
+
+                int diff = lvl[ix][iz] - orig[ix][iz];
+                if (diff == 0) continue;
+
+                int wx = center.getX() + dx;
+                int wz = center.getZ() + dz;
+
+                if (addDeltaIfLoaded(wx, y, wz, diff)) {
+                    touched.add(new BlockPos(wx, y, wz));
+                }
+            }
+        }
+
+        return touched;
+    }
+
+    private boolean addDeltaIfLoaded(int worldX, int worldY, int worldZ, int amount) {
+        if (amount == 0) return false;
+
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        WaterRegion region = regions.get(key);
+        if (region == null) return false;
+
+        int localX = Math.floorMod(worldX, REGION_SIZE_X);
+        int localY = Math.floorMod(worldY, REGION_SIZE_Y);
+        int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
+
+        int base = region.getLevel(localX, localY, localZ);
+        int pending = region.getDelta(localX, localY, localZ);
+        int effective = base + pending;
+
+        int safe = amount;
+
+        if (safe > 0) {
+            int room = WaterRegion.MAX_LEVEL - effective;
+            if (room <= 0) return false;
+            if (safe > room) safe = room;
+        } else {
+            if (effective <= 0) return false;
+            int maxRemoval = -effective;
+            if (safe < maxRemoval) safe = maxRemoval;
+        }
+
+        region.addDelta(localX, localY, localZ, safe);
+        activeRegions.add(key);
+        return true;
+    }
+
+    private void wakeAround(HashSet<BlockPos> touched) {
+        for (BlockPos p : touched) {
+            wakeAtIfLoaded(p.getX(), p.getY(), p.getZ());
+
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    int wx = p.getX() + dx;
+                    int wy = p.getY();
+                    int wz = p.getZ() + dz;
+                    wakeAtIfLoaded(wx, wy, wz);
+                }
+            }
+
+            wakeAtIfLoaded(p.getX(), p.getY() + 1, p.getZ());
+            wakeAtIfLoaded(p.getX(), p.getY() - 1, p.getZ());
+        }
+    }
+
+    private void wakeAtIfLoaded(int worldX, int worldY, int worldZ) {
+        RegionKey key = regionKeyForBlock(worldX, worldY, worldZ);
+        WaterRegion region = regions.get(key);
+        if (region == null) return;
+
+        int localX = Math.floorMod(worldX, REGION_SIZE_X);
+        int localY = Math.floorMod(worldY, REGION_SIZE_Y);
+        int localZ = Math.floorMod(worldZ, REGION_SIZE_Z);
+
+        region.markCellActive(localX, localY, localZ);
+        activeRegions.add(key);
+    }
+
+
+    public void removeWaterAt(BlockPos pos) {
         RegionKey rKey = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
         WaterRegion region = regions.get(rKey);
         if (region == null) return; // shouldn't happen tho
@@ -194,7 +383,7 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
         region.setLevel(x, y, z, 0);
     }
 
-    public void disturb(ServerWorld world, BlockPos pos) {
+    public void disturb(BlockPos pos) {
         RegionKey rKey = regionKeyForBlock(pos.getX(), pos.getY(), pos.getZ());
         WaterRegion region = getOrCreateRegion(rKey);
 
@@ -208,15 +397,15 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
         activeRegions.add(rKey);
     }
 
-    public void disturbAround(ServerWorld world, BlockPos pos) {
-        disturb(world, pos);
+    public void disturbAround(BlockPos pos) {
+        disturb(pos);
 
-        disturb(world, pos.up());
-        disturb(world, pos.down());
-        disturb(world, pos.north());
-        disturb(world, pos.south());
-        disturb(world, pos.east());
-        disturb(world, pos.west());
+        disturb(pos.up());
+        disturb(pos.down());
+        disturb(pos.north());
+        disturb(pos.south());
+        disturb(pos.east());
+        disturb(pos.west());
     }
 
     public void syncSolids(ServerWorld world, RegionKey rKey, WaterRegion region) {
@@ -279,8 +468,6 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
             if (safeAmount < maxRemoval) safeAmount = maxRemoval;
         }
 
-        if (safeAmount == 0) return;
-
         region.addDelta(localX, localY, localZ, safeAmount);
         activeRegions.add(key);
     }
@@ -335,7 +522,7 @@ public class WaterRegionManager implements WaterDeltaSink, WaterQuery, WaterActi
 
     public void tick(ServerWorld world) {
         // simulation speed
-        if ((world.getTime() % 1L) != 0L) {
+        if ((world.getTime() % 2L) != 0L) {
             return;
         }
 

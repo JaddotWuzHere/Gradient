@@ -46,7 +46,7 @@ public class Gradient implements ModInitializer {
 			if (stack.isOf(Items.LAPIS_BLOCK)) {
 				BlockPos waterPos = chooseWaterColumnPos(serverWorld, hitResult);
 				if (waterPos != null) {
-					WaterHooks.onWaterPlaced(serverWorld, waterPos);
+					WaterHooks.onWaterPlaced(serverWorld, waterPos, 1);
 					return ActionResult.SUCCESS;
 				}
 				return ActionResult.PASS;

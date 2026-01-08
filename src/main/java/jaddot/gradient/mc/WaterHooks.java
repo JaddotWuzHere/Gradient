@@ -9,19 +9,24 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 public class WaterHooks {
-    public static void onWaterPlaced(ServerWorld world, BlockPos pos) {
+    public static void onWaterPlaced(ServerWorld world, BlockPos pos, int amount) {
         WaterRegionManager manager = getManager(world);
-        manager.injectWater(world, pos);
+
+        if (amount == 1) {
+            manager.onPlayerAddOneLevel(world, pos);
+        } else {
+            manager.injectWater(world, pos, amount);
+        }
     }
 
     public static void onBlockBroken(ServerWorld world, BlockPos pos, BlockState oldState) {
         WaterRegionManager manager = getManager(world);
 
         if (oldState.isOf(ModBlocks.WATER_LAYER)) {
-            manager.removeWaterAt(world, pos);
+            manager.removeWaterAt(pos);
         }
 
-        manager.disturbAround(world, pos);
+        manager.disturbAround(pos);
     }
 
     public static void onWorldTick(ServerWorld world) {
