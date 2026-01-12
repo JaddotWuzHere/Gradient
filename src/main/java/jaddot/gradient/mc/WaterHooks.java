@@ -8,8 +8,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
-import static jaddot.gradient.Gradient.LOGGER;
-
 public class WaterHooks {
 
     /* -------------------------------------------- */
@@ -32,14 +30,13 @@ public class WaterHooks {
 
         // cell became blocked
         if (!blocksWater(oldState) && blocksWater(newState) && level > 0) {
+
             // TODO: displace water
-            LOGGER.info("cell just became blocked!");
             manager.removeWaterAt(pos.getX(), pos.getY(), pos.getZ());
         }
 
         // cell became unblocked
         if (blocksWater(oldState) && !blocksWater(newState)) {
-            LOGGER.info("cell just became unblocked!");
             if (manager.isRegionLoadedAt(pos.getX(), pos.getY(), pos.getZ())) {
                 manager.disturbAround(pos);
             }
@@ -55,17 +52,6 @@ public class WaterHooks {
                state.isOf(ModBlocks.WATER_LAYER) ||
                state.isReplaceable();
     }
-
-//    DEPRECATED
-//    public static void onBlockBroken(ServerWorld world, BlockPos pos, BlockState oldState) {
-//        WaterRegionManager manager = getManager(world);
-//
-//        if (oldState.isOf(ModBlocks.WATER_LAYER)) {
-//            manager.removeWaterAt(pos.getX(), pos.getY(), pos.getZ());
-//        }
-//
-//        manager.disturbAround(pos);
-//    }
 
     /* -------------------------------------------- */
     /*                 manager stuff                */

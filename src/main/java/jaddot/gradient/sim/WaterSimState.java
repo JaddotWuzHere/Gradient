@@ -30,7 +30,7 @@ public class WaterSimState extends PersistentState {
     public WaterSimState(Map<RegionKey, RegionSnapshot> initialSnapshots) {
         this.snapshots.putAll(initialSnapshots);
         this.manager = new WaterRegionManager(this);
-        this.manager.bootstrapAllFromSnapshots();
+        this.manager.bootstrapFromSnapshots();
     }
 
     /* -------------------------------------------- */

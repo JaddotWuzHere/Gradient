@@ -12,7 +12,7 @@ public class WaterRegion {
     public static final int SEEK = 2;
 
     private final int originX, originY, originZ;
-    private final int sizeX, sizeY, sizeZ;
+    private final int size;
     private final int[][][] levels;
     private final int[][][] deltas;
 
@@ -49,20 +49,18 @@ public class WaterRegion {
             { 0,-1, 0 }
     };
 
-    public WaterRegion(int sizeX, int sizeY, int sizeZ, int originX, int originY, int originZ) {
-        this.sizeX = sizeX;
-        this.sizeY = sizeY;
-        this.sizeZ = sizeZ;
+    public WaterRegion(int size, int originX, int originY, int originZ) {
+        this.size = size;
         this.originX = originX;
         this.originY = originY;
         this.originZ = originZ;
 
-        levels = new int[sizeX][sizeY][sizeZ];
-        deltas = new int[sizeX][sizeY][sizeZ];
+        levels = new int[size][size][size];
+        deltas = new int[size][size][size];
 
-        solids = new boolean[sizeX][sizeY][sizeZ];
+        solids = new boolean[size][size][size];
 
-        activeCells = new boolean[sizeX][sizeY][sizeZ];
+        activeCells = new boolean[size][size][size];
 
         currentActive = new ArrayDeque<>();
     }
@@ -109,11 +107,11 @@ public class WaterRegion {
     /* -------------------------------------------- */
 
     public byte[] toFlatLevels() {
-        byte[] flattened = new byte[sizeX * sizeY * sizeZ];
+        byte[] flattened = new byte[size * size * size];
         int i = 0;
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
+        for (int x = 0; x < size; x++) {
+            for (int y = 0; y < size; y++) {
+                for (int z = 0; z < size; z++) {
                     int level = levels[x][y][z];
                     if (level < 0) level = 0;
                     if (level > MAX_LEVEL) level = MAX_LEVEL;
@@ -126,14 +124,14 @@ public class WaterRegion {
     }
 
     public void loadFlatLevels(byte[] flattened) {
-        int expected = sizeX * sizeY * sizeZ;
+        int expected = size * size * size;
         // some error thingy
         if (flattened.length != expected) throw new IllegalArgumentException("sum fucked up cuh");
 
         int i = 0;
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
+        for (int x = 0; x < size; x++) {
+            for (int y = 0; y < size; y++) {
+                for (int z = 0; z < size; z++) {
                     int level = flattened[i] & 0xFF;
                     if (level > MAX_LEVEL) level = MAX_LEVEL;
                     levels[x][y][z] = level;
@@ -143,9 +141,9 @@ public class WaterRegion {
         }
 
         // clear the old stuff
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
+        for (int x = 0; x < size; x++) {
+            for (int y = 0; y < size; y++) {
+                for (int z = 0; z < size; z++) {
                     deltas[x][y][z] = 0;
                     activeCells[x][y][z] = false;
                 }
@@ -159,18 +157,18 @@ public class WaterRegion {
         boolean any = false;
 
         // clear old stuff
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
+        for (int x = 0; x < size; x++) {
+            for (int y = 0; y < size; y++) {
+                for (int z = 0; z < size; z++) {
                     activeCells[x][y][z] = false;
                 }
             }
         }
         currentActive.clear();
 
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
+        for (int x = 0; x < size; x++) {
+            for (int y = 0; y < size; y++) {
+                for (int z = 0; z < size; z++) {
                     int lvl = levels[x][y][z];
                     if (lvl > 0 && !solids[x][y][z]) {
                         markCellActive(x, y, z);
@@ -197,9 +195,9 @@ public class WaterRegion {
     private boolean applyDeltasAndSeedActive() {
         boolean any = false;
 
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
+        for (int x = 0; x < size; x++) {
+            for (int y = 0; y < size; y++) {
+                for (int z = 0; z < size; z++) {
                     int d = deltas[x][y][z];
                     if (d != 0) {
                         levels[x][y][z] += d;
@@ -444,9 +442,9 @@ public class WaterRegion {
             int toLocalY = worldTy - originY;
             int toLocalZ = worldTz - originZ;
 
-            if (0 <= toLocalX && toLocalX < sizeX &&
-                    0 <= toLocalY && toLocalY < sizeY &&
-                    0 <= toLocalZ && toLocalZ < sizeZ) {
+            if (0 <= toLocalX && toLocalX < size &&
+                    0 <= toLocalY && toLocalY < size &&
+                    0 <= toLocalZ && toLocalZ < size) {
                 touched.add(new Cell(toLocalX, toLocalY, toLocalZ));
             }
         }
@@ -465,9 +463,9 @@ public class WaterRegion {
                 int ny = c.y;
                 int nz = c.z + off[2];
 
-                if (nx < 0 || nx >= sizeX ||
-                        ny < 0 || ny >= sizeY ||
-                        nz < 0 || nz >= sizeZ) {
+                if (nx < 0 || nx >= size ||
+                        ny < 0 || ny >= size ||
+                        nz < 0 || nz >= size) {
                     continue;
                 }
 
@@ -487,7 +485,7 @@ public class WaterRegion {
                 int worldNy = originY + ny;
                 int worldNz = originZ + nz;
 
-                if (ny < 0 || ny >= sizeY) {
+                if (ny < 0 || ny >= size) {
                     activation.markActiveAt(worldNx, worldNy, worldNz);
                     continue;
                 }

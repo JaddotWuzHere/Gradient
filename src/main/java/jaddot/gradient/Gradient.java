@@ -21,7 +21,7 @@ public class Gradient implements ModInitializer {
 
 		ServerTickEvents.END_WORLD_TICK.register(WaterHooks::onWorldTick);
 
-		// DEV ONLY STUFF REMOVE WHEN SHIPPING
+		// DEV ONLY STUFF
 		DevControls.register();
 	}
 
