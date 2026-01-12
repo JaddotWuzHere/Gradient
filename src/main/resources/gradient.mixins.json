@@ -1,8 +1,9 @@
 {
 	"required": true,
-	"package": "jaddot.gradient.mixin",
+	"package": "jaddot.gradient.mc.mixins",
 	"compatibilityLevel": "JAVA_17",
 	"mixins": [
+		"WaterMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
