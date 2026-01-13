@@ -8,11 +8,13 @@ import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 public class WorldIO {
-    private static final int SMOOTH_R = 1;
-    private static final int SMOOTH_STEPS = 2;
+    private static final int SMOOTH_R = 10;
 
     private final RegionGrid grid;
     private final RegionOperations ops;
@@ -166,128 +168,139 @@ public class WorldIO {
 
     public void onPlayerAddOneLevel(ServerWorld world, BlockPos pos) {
         injectWater(world, pos, 1);
-        HashSet<BlockPos> touched = smoothLocalPulse(pos);
+        HashSet<BlockPos> touched = smooth(pos);
 
         for (BlockPos blockPos : touched) {
             wakeAround(blockPos);
         }
     }
 
-    private HashSet<BlockPos> smoothLocalPulse(BlockPos center) {
-        int y = center.getY();
-        int R = SMOOTH_R;
-        int size = 2 * R + 1;
+    private HashSet<BlockPos> smooth(BlockPos center) {
+        HashSet<BlockPos> S = gather(center);
 
-        int[][] lvl = new int[size][size];
-        boolean[][] ok = new boolean[size][size];
+        if (S.size() == 1) return S;
+        if (maxDifference(S) <= 1) return S;
 
-        for (int dx = -R; dx <= R; dx++) {
-            for (int dz = -R; dz <= R; dz++) {
-                int wx = center.getX() + dx;
-                int wz = center.getZ() + dz;
-                int ix = dx + R;
-                int iz = dz + R;
+        int total = computeTotalWater(S);
+        int base = total / S.size();
+        int rem = total % S.size();
 
-                if (!grid.isRegionLoadedAt(wx, y, wz)) {
-                    ok[ix][iz] = false;
-                    lvl[ix][iz] = 0;
-                    continue;
-                }
+        List<BlockPos> L = order(S, center);
 
-                if (ops.isSolidAt(wx, y, wz)) {
-                    ok[ix][iz] = false;
-                    lvl[ix][iz] = 0;
-                    continue;
-                }
+        int i = 0;
+        for (BlockPos pos : L) {
+            int level = ops.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
+            int amount = base - level;
+            if (i < rem) {
+                ops.add(pos.getX(), pos.getY(), pos.getZ(), amount + 1);
+            } else {
+                ops.add(pos.getX(), pos.getY(), pos.getZ(), amount);
+            }
+            i++;
+        }
 
-                ok[ix][iz] = true;
-                lvl[ix][iz] = ops.getEffectiveLevel(wx, y, wz);
+        return S;
+    }
+
+    private HashSet<BlockPos> gather(BlockPos seedPos) {
+        ArrayDeque<BlockPos> toVisit = new ArrayDeque<>();
+        HashSet<BlockPos> visited = new HashSet<>();
+
+        toVisit.add(seedPos);
+        visited.add(seedPos);
+
+        for (int depth = 0; depth < SMOOTH_R; depth++) {
+            int layerSize = toVisit.size();
+
+            for (int i = 0; i < layerSize; i++) {
+                BlockPos pos = toVisit.pop();
+
+                tryNeighbor(pos.north(), toVisit, visited, seedPos);
+                tryNeighbor(pos.east(), toVisit, visited, seedPos);
+                tryNeighbor(pos.south(), toVisit, visited, seedPos);
+                tryNeighbor(pos.west(), toVisit, visited, seedPos);
             }
         }
 
-        int[][] orig = new int[size][size];
-        for (int i = 0; i < size; i++) {
-            System.arraycopy(lvl[i], 0, orig[i], 0, size);
+        return visited;
+    }
+
+    private void tryNeighbor(
+            BlockPos neighbor,
+            ArrayDeque<BlockPos> toVisit,
+            HashSet<BlockPos> visited,
+            BlockPos center
+    ) {
+        int nx = neighbor.getX();
+        int ny = neighbor.getY();
+        int nz = neighbor.getZ();
+        int cx = center.getX();
+        int cy = center.getY();
+        int cz = center.getZ();
+
+        if (Math.abs(nx - cx) + Math.abs(nz - cz) > SMOOTH_R) return;
+        if (neighbor.getY() != center.getY()) return;
+        if (ops.isSolidAt(nx, ny, nz)) return;
+        if (ops.getEffectiveLevel(nx, ny, nz) <= 0) return;
+
+        if (visited.add(neighbor)) {
+            toVisit.add(neighbor);
+        }
+    }
+
+    private int maxDifference(HashSet<BlockPos> S) {
+        var iterator = S.iterator();
+        BlockPos first = iterator.next();
+        int maxLevel = ops.getEffectiveLevel(first.getX(), first.getY(), first.getZ());
+        int minLevel = maxLevel;
+
+        while (iterator.hasNext()) {
+            BlockPos pos = iterator.next();
+            int level = ops.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
+            if (level > maxLevel) maxLevel = level;
+            if (level < minLevel) minLevel = level;
         }
 
-        final int[][] DIRS4 = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+        return maxLevel - minLevel;
+    }
 
-        for (int s = 0; s < SMOOTH_STEPS; s++) {
-            int[][] d = new int[size][size];
+    private int computeTotalWater(HashSet<BlockPos> S) {
+        var iterator = S.iterator();
+        int total = 0;
 
-            for (int ix = 0; ix < size; ix++) {
-                for (int iz = 0; iz < size; iz++) {
-                    if (!ok[ix][iz]) continue;
-                    int a = lvl[ix][iz];
-                    if (a <= 0) continue;
-
-                    int bestNx = -1, bestNz = -1;
-                    int bestVal = Integer.MAX_VALUE;
-
-                    for (int[] dir : DIRS4) {
-                        int nx = ix + dir[0];
-                        int nz = iz + dir[1];
-                        if (nx < 0 || nx >= size || nz < 0 || nz >= size) continue;
-                        if (!ok[nx][nz]) continue;
-
-                        int b = lvl[nx][nz];
-                        if (b < bestVal) {
-                            bestVal = b;
-                            bestNx = nx;
-                            bestNz = nz;
-                        }
-                    }
-
-                    if (bestNx == -1) continue;
-
-                    if (a - bestVal >= 1 && bestVal < WaterRegion.MAX_LEVEL) {
-                        d[ix][iz] -= 1;
-                        d[bestNx][bestNz] += 1;
-                    }
-                }
-            }
-
-            boolean any = false;
-            for (int ix = 0; ix < size; ix++) {
-                for (int iz = 0; iz < size; iz++) {
-                    int delta = d[ix][iz];
-                    if (delta == 0) continue;
-
-                    int v = lvl[ix][iz] + delta;
-                    if (v < 0) v = 0;
-                    if (v > WaterRegion.MAX_LEVEL) v = WaterRegion.MAX_LEVEL;
-
-                    if (v != lvl[ix][iz]) {
-                        lvl[ix][iz] = v;
-                        any = true;
-                    }
-                }
-            }
-
-            if (!any) break;
+        while (iterator.hasNext()) {
+            BlockPos pos = iterator.next();
+            total += ops.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
         }
 
-        HashSet<BlockPos> touched = new HashSet<>();
+        return total;
+    }
 
-        for (int dx = -R; dx <= R; dx++) {
-            for (int dz = -R; dz <= R; dz++) {
-                int ix = dx + R;
-                int iz = dz + R;
-                if (!ok[ix][iz]) continue;
+    private List<BlockPos> order(HashSet<BlockPos> S, BlockPos center) {
+        ArrayList<BlockPos> L = new ArrayList<>(S);
 
-                int diff = lvl[ix][iz] - orig[ix][iz];
-                if (diff == 0) continue;
+        int cx = center.getX();
+        int cz = center.getZ();
 
-                int wx = center.getX() + dx;
-                int wz = center.getZ() + dz;
+        L.sort((a, b) -> {
+            int la = ops.getEffectiveLevel(a.getX(), a.getY(), a.getZ());
+            int lb = ops.getEffectiveLevel(b.getX(), b.getY(), b.getZ());
+            if (la != lb) return Integer.compare(la, lb);
 
-                if (addDeltaIfLoaded(wx, y, wz, diff)) {
-                    touched.add(new BlockPos(wx, y, wz));
-                }
-            }
-        }
+            int da = Math.abs(a.getX() - cx) + Math.abs(a.getZ() - cz);
+            int db = Math.abs(b.getX() - cx) + Math.abs(b.getZ() - cz);
+            if (da != db) return Integer.compare(da, db);
 
-        return touched;
+            int dx = Integer.compare(a.getX(), b.getX());
+            if (dx != 0) return dx;
+
+            int dz = Integer.compare(a.getZ(), b.getZ());
+            if (dz != 0) return dz;
+
+            return Integer.compare(a.getY(), b.getY());
+        });
+
+        return L;
     }
 
     private boolean addDeltaIfLoaded(int worldX, int worldY, int worldZ, int amount) {
