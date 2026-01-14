@@ -6,6 +6,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class WaterRegionManager {
@@ -85,5 +86,17 @@ public class WaterRegionManager {
 
     public void disturbAround(BlockPos pos) {
         worldIO.disturbAround(pos);
+    }
+
+    public void displace(BlockPos pos, List<BlockPos> validNeighbors, BlockPos up) {
+        ops.displace(pos, validNeighbors, up);
+    }
+
+    public List<BlockPos> getValidNeighbors(BlockPos pos) {
+        return ops.getValidNeighbors(pos);
+    }
+
+    public BlockPos getValidUp(BlockPos pos) {
+        return ops.getValidUp(pos);
     }
 }

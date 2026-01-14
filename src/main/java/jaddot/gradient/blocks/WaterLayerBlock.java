@@ -29,4 +29,9 @@ public class WaterLayerBlock extends SnowBlock {
     public VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext ctx) {
         return VoxelShapes.empty();
     }
+
+    @Override
+    public boolean canReplace(BlockState state, net.minecraft.item.ItemPlacementContext ctx) {
+        return true;
+    }
 }
