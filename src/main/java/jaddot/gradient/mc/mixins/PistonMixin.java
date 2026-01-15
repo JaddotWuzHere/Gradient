@@ -25,7 +25,7 @@ public class PistonMixin {
 
     @Inject(method = "calculatePush()Z", at = @At("RETURN"), cancellable = true)
     private void gradient$blockPistonIfWouldCrushWater(CallbackInfoReturnable<Boolean> cir) {
-        if (!cir.getReturnValueZ()) return; // vanilla already blocked it
+        if (!cir.getReturnValueZ()) return;
         if (!(world instanceof ServerWorld serverWorld)) return;
 
         for (BlockPos src : movedBlocks) {
@@ -34,7 +34,7 @@ public class PistonMixin {
             BlockState dstOld = serverWorld.getBlockState(dst);
 
             if (!WaterHooks.allowedPlace(serverWorld, dst, dstOld, movedState)) {
-                cir.setReturnValue(false); // piston behaves like it's blocked (obsidian-style)
+                cir.setReturnValue(false);
                 return;
             }
         }

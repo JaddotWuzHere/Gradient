@@ -40,8 +40,8 @@ public class WorldIO {
 
                     boolean isSolid =
                             !state.isAir() &&
-                                    !state.isOf(ModBlocks.WATER_LAYER) &&
-                                    !state.isOf(Blocks.REDSTONE_BLOCK);
+                            !state.isOf(Blocks.WATER) &&
+                            !state.isOf(Blocks.BUBBLE_COLUMN);
 
                     region.setSolid(x, y, z, isSolid);
 
@@ -66,6 +66,7 @@ public class WorldIO {
             for (int x = 0; x < size; x++) {
                 for (int y = 0; y < size; y++) {
                     for (int z = 0; z < size; z++) {
+
                         int wl = region.getLevel(x, y, z);
                         boolean solidHere = region.isSolid(x, y, z);
 
@@ -75,21 +76,29 @@ public class WorldIO {
                         BlockPos pos = new BlockPos(wx, wy, wz);
 
                         var state = world.getBlockState(pos);
-                        if (wl > 0 && !solidHere) {
-                            int layers = (wl + 1) / 2;
-                            world.setBlockState(
-                                    pos,
-                                    ModBlocks.WATER_LAYER.getDefaultState()
-                                            .with(SnowBlock.LAYERS, layers)
-                            );
-                        } else if (wl == 0 && state.isOf(ModBlocks.WATER_LAYER)) {
-                            world.setBlockState(pos, Blocks.AIR.getDefaultState());
+
+                        if (solidHere) {
+                            if (state.isOf(Blocks.WATER) || state.isOf(ModBlocks.WATER_LAYER)) {
+                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
+                            }
+                            continue;
+                        }
+
+                        if (wl > 0) {
+                            if (!state.isOf(Blocks.WATER)) {
+                                world.setBlockState(pos, Blocks.WATER.getDefaultState(), 2);
+                            }
+                        } else {
+                            if (state.isOf(Blocks.WATER) || state.isOf(ModBlocks.WATER_LAYER)) {
+                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
+                            }
                         }
                     }
                 }
             }
         });
     }
+
 
     public WaterRegion injectWater(ServerWorld world, BlockPos pos, int amount) {
         RegionAddress address = grid.addressOf(pos);
@@ -116,8 +125,7 @@ public class WorldIO {
 
             var state = world.getBlockState(pos);
             boolean isSolid = !state.isAir() &&
-                    !state.isOf(ModBlocks.WATER_LAYER);
-
+                    !state.isOf(Blocks.WATER);
             if (isSolid) {
                 return false;
             }

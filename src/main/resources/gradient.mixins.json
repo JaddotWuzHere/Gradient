@@ -5,7 +5,9 @@
 	"mixins": [
 		"WaterMixin",
 		"PlaceMixin",
-		"PistonMixin"
+		"PistonMixin",
+		"FlowableFluidMixin",
+		"FluidScheduledTickMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

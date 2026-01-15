@@ -5,8 +5,6 @@ import jaddot.gradient.sim.WaterSimState;
 import jaddot.gradient.world.WaterRegionManager;
 import net.minecraft.block.BlockState;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.state.property.IntProperty;
-import net.minecraft.state.property.Property;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
