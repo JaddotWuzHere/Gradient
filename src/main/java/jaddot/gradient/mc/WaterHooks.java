@@ -5,12 +5,15 @@ import jaddot.gradient.sim.WaterSimState;
 import jaddot.gradient.world.WaterRegionManager;
 import net.minecraft.block.BlockState;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.property.IntProperty;
+import net.minecraft.state.property.Property;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkStatus;
 
 import java.util.List;
+import java.util.Set;
 
 public class WaterHooks {
 
@@ -87,7 +90,8 @@ public class WaterHooks {
                 pos.north(),
                 pos.east(),
                 pos.south(),
-                pos.west()
+                pos.west(),
+                pos.up()
         };
 
         for (BlockPos n : ns) {

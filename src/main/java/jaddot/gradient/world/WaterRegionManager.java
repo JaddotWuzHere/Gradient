@@ -99,4 +99,9 @@ public class WaterRegionManager {
     public BlockPos getValidUp(BlockPos pos) {
         return ops.getValidUp(pos);
     }
+
+    public void activateRegion(int worldX, int worldY, int worldZ) {
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
+        ops.getOrCreateActiveRegion(key);
+    }
 }
