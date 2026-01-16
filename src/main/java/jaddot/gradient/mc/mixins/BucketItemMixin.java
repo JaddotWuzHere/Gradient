@@ -22,8 +22,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.*;
+
 @Mixin(BucketItem.class)
 public class BucketItemMixin {
+    private static final int MAX = 16;
+
     @Inject(
             method = "use(Lnet/minecraft/world/World;Lnet/minecraft/entity/player/PlayerEntity;Lnet/minecraft/util/Hand;)Lnet/minecraft/util/TypedActionResult;",
             at = @At("HEAD"),
@@ -33,50 +37,85 @@ public class BucketItemMixin {
                                             CallbackInfoReturnable<TypedActionResult<ItemStack>> cir) {
 
         ItemStack stack = player.getStackInHand(hand);
-        if (!stack.isOf(Items.WATER_BUCKET)) return;
 
-        if (world.isClient) {
-            cir.setReturnValue(TypedActionResult.success(stack, true)); // clientSuccess = true
-            return;
-        }
+        boolean isEmpty = stack.isOf(Items.BUCKET);
+        boolean isWater = stack.isOf(Items.WATER_BUCKET);
+        if (!isEmpty && !isWater) return;
 
-        ServerWorld serverWorld = (ServerWorld) world;
-        ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
+        BlockHitResult hit = ItemRaycastAccessor.gradient$invokeRaycast(
+                world, player, RaycastContext.FluidHandling.NONE
+        );
+        if (hit.getType() != HitResult.Type.BLOCK) return;
 
-        BlockHitResult hit = ItemRaycastAccessor.gradient$invokeRaycast(world, player, RaycastContext.FluidHandling.NONE);
-        if (hit.getType() != HitResult.Type.BLOCK) {
-            cir.setReturnValue(TypedActionResult.pass(stack));
-            return;
-        }
-
-        BlockPos clickedPos = hit.getBlockPos();
+        BlockPos clicked = hit.getBlockPos();
         Direction side = hit.getSide();
-        BlockState clickedState = world.getBlockState(clickedPos);
+        BlockState clickedState = world.getBlockState(clicked);
 
-        BlockPos targetPos = WaterHooks.isWaterReplaceable(clickedState)
-                ? clickedPos
-                : clickedPos.offset(side);
+        BlockPos target = WaterHooks.isWaterReplaceable(clickedState)
+                ? clicked
+                : clicked.offset(side);
 
+        if (world.isClient()) {
+            TypedActionResult.success(stack, true);
+            return;
+        }
+
+        if (!(world instanceof ServerWorld serverWorld)) return;
+        if (!(player instanceof ServerPlayerEntity sp)) return;
+
+        boolean shift = sp.isSneaking();
+
+        // pickup
+        if (isEmpty) {
+            int pickedUp;
+
+            if (shift) {
+                pickedUp = WaterHooks.tryExtract(serverWorld, target, 1);
+            } else {
+                pickedUp = WaterHooks.pickupConnected(serverWorld, target, MAX);
+            }
+
+            if (pickedUp <= 0) {
+                cir.setReturnValue(TypedActionResult.fail(stack));
+                return;
+            }
+
+            ItemStack filled = new ItemStack(Items.WATER_BUCKET);
+            BucketData.setUnits(filled, pickedUp);
+
+            if (!sp.getAbilities().creativeMode) {
+                sp.setStackInHand(hand, filled);
+                cir.setReturnValue(TypedActionResult.success(filled, false));
+            } else {
+                cir.setReturnValue(TypedActionResult.success(stack, false));
+            }
+            return;
+        }
+
+        // place
         int units = BucketData.getUnits(stack);
-        boolean shift = serverPlayer.isSneaking();
-        int req = shift ? 1 : units;
+        if (units <= 0) {
+            if (!sp.getAbilities().creativeMode) {
+                sp.setStackInHand(hand, new ItemStack(Items.BUCKET));
+            }
+            cir.setReturnValue(TypedActionResult.success(sp.getStackInHand(hand), false));
+            return;
+        }
 
-        int placed = WaterHooks.tryInsert(serverWorld, targetPos, req);
+        int req = shift ? 1 : units;
+        int placed = WaterHooks.tryInsert(serverWorld, target, req);
+
         if (placed <= 0) {
             cir.setReturnValue(TypedActionResult.fail(stack));
             return;
         }
 
-        boolean creative = serverPlayer.getAbilities().creativeMode;
-        if (!creative) {
+        if (!sp.getAbilities().creativeMode) {
             int remaining = units - placed;
-            if (remaining <= 0) {
-                serverPlayer.setStackInHand(hand, new ItemStack(Items.BUCKET));
-            } else {
-                BucketData.setUnits(stack, remaining);
-            }
+            if (remaining <= 0) sp.setStackInHand(hand, new ItemStack(Items.BUCKET));
+            else BucketData.setUnits(stack, remaining);
         }
 
-        cir.setReturnValue(TypedActionResult.success(serverPlayer.getStackInHand(hand)));
+        cir.setReturnValue(TypedActionResult.success(sp.getStackInHand(hand), false));
     }
 }

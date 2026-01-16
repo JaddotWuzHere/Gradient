@@ -129,6 +129,26 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
         activateRegion(key);
     }
 
+    public void removeWaterAmount(int worldX, int worldY, int worldZ, int amount) {
+        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
+
+        RegionKey key = address.key();
+        WaterRegion region = grid.getLoadedRegion(key);
+
+        if (region == null) return; // shouldn't happen tho
+
+        int localX = address.lx();
+        int localY = address.ly();
+        int localZ = address.lz();
+
+        int level = getEffectiveLevel(worldX, worldY, worldZ);
+
+        region.setLevel(localX, localY, localZ, level - amount);
+        region.clearDelta(localX, localY, localZ);
+        region.markCellActive(localX, localY, localZ);
+        activateRegion(key);
+    }
+
     public WaterRegion getOrCreateActiveRegion(RegionKey key) {
         boolean wasLoaded = grid.isRegionLoaded(key);
         WaterRegion region = grid.getOrCreateRegion(key);

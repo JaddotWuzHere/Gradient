@@ -11,7 +11,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkStatus;
 
-import java.util.List;
+import java.util.*;
 
 public class WaterHooks {
 
@@ -43,6 +43,77 @@ public class WaterHooks {
         int placed = Math.min(req, cap);
         onWaterPlaced(world, pos, placed);
         return placed;
+    }
+
+    public static int tryExtract(ServerWorld world, BlockPos pos, int req) {
+        if (req <= 0) return 0;
+
+        WaterRegionManager manager = getManager(world);
+
+        int level = manager.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
+        if (level <= 0) return 0;
+
+        int taken = Math.min(req, level);
+
+        manager.removeWaterAmount(pos.getX(), pos.getY(), pos.getZ(), taken);
+
+        manager.disturbAround(pos);
+
+        return taken;
+    }
+
+    public static int pickupConnected(ServerWorld world, BlockPos start, int cap) {
+        if (cap <= 0) return 0;
+
+        Deque<BlockPos> q = new ArrayDeque<>();
+        Deque<BlockPos> qUp = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+
+        if (WaterHooks.getManager(world).getEffectiveLevel(start.getX(), start.getY(), start.getZ()) <= 0) {
+            return 0;
+        }
+
+        q.add(start);
+        visited.add(start);
+
+        int picked = 0;
+
+        int stepsLeft = 512;
+
+        while (cap > 0 && stepsLeft-- > 0) {
+            BlockPos pos;
+
+            if (!q.isEmpty()) pos = q.removeFirst();
+            else if (!qUp.isEmpty()) pos = qUp.removeFirst();
+            else break;
+
+            int got = WaterHooks.tryExtract(world, pos, cap);
+            if (got <= 0) {
+                continue;
+            }
+
+            picked += got;
+            cap -= got;
+
+            BlockPos n = pos.north();
+            BlockPos s = pos.south();
+            BlockPos e = pos.east();
+            BlockPos w = pos.west();
+            BlockPos d = pos.down();
+            BlockPos u = pos.up();
+
+            var mgr = WaterHooks.getManager(world);
+
+            if (visited.add(n) && mgr.getEffectiveLevel(n.getX(), n.getY(), n.getZ()) > 0) q.addLast(n);
+            if (visited.add(s) && mgr.getEffectiveLevel(s.getX(), s.getY(), s.getZ()) > 0) q.addLast(s);
+            if (visited.add(e) && mgr.getEffectiveLevel(e.getX(), e.getY(), e.getZ()) > 0) q.addLast(e);
+            if (visited.add(w) && mgr.getEffectiveLevel(w.getX(), w.getY(), w.getZ()) > 0) q.addLast(w);
+            if (visited.add(d) && mgr.getEffectiveLevel(d.getX(), d.getY(), d.getZ()) > 0) q.addLast(d);
+
+            if (visited.add(u) && mgr.getEffectiveLevel(u.getX(), u.getY(), u.getZ()) > 0) qUp.addLast(u);
+        }
+
+        return picked;
     }
 
 

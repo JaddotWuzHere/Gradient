@@ -1,6 +1,5 @@
 package jaddot.gradient.mc;
 
-import jaddot.gradient.mc.mixins.BucketItemMixin;
 import net.minecraft.item.ItemStack;
 
 public final class BucketData {

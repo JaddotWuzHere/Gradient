@@ -80,6 +80,10 @@ public class WaterRegionManager {
         ops.removeWaterAt(worldX, worldY, worldZ);
     }
 
+    public void removeWaterAmount(int worldX, int worldY, int worldZ, int amount) {
+        ops.removeWaterAmount(worldX, worldY, worldZ, amount);
+    }
+
     public boolean isRegionLoadedAt(int worldX, int worldY, int worldZ) {
         return grid.isRegionLoadedAt(worldX, worldY, worldZ);
     }
