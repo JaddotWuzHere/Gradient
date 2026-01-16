@@ -1,6 +1,7 @@
 package jaddot.gradient.mc;
 
 import jaddot.gradient.ModBlocks;
+import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
 import jaddot.gradient.world.WaterRegionManager;
 import net.minecraft.block.BlockState;
@@ -36,7 +37,7 @@ public class WaterHooks {
         WaterRegionManager manager = getManager(world);
 
         int level = manager.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
-        int cap = 16 - level;
+        int cap = WaterRegion.MAX_LEVEL - level;
         if (cap <= 0) return 0;
 
         int placed = Math.min(req, cap);

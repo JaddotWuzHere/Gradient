@@ -8,7 +8,10 @@
 		"PistonMixin",
 		"FlowableFluidMixin",
 		"FluidScheduledTickMixin",
-		"BucketItemMixin"
+		"BucketItemMixin",
+		"ItemBarMixin",
+		"BucketTooltipMixin",
+		"ItemRaycastAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

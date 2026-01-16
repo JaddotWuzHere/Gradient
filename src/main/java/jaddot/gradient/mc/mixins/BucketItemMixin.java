@@ -1,93 +1,82 @@
 package jaddot.gradient.mc.mixins;
 
+import jaddot.gradient.mc.BucketData;
 import jaddot.gradient.mc.WaterHooks;
-import jaddot.gradient.sim.WaterRegion;
 import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BucketItem;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemUsageContext;
 import net.minecraft.item.Items;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.TypedActionResult;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(net.minecraft.item.Item.class)
+@Mixin(BucketItem.class)
 public class BucketItemMixin {
     @Inject(
-            method = "useOnBlock(Lnet/minecraft/item/ItemUsageContext;)Lnet/minecraft/util/ActionResult;",
+            method = "use(Lnet/minecraft/world/World;Lnet/minecraft/entity/player/PlayerEntity;Lnet/minecraft/util/Hand;)Lnet/minecraft/util/TypedActionResult;",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void gradient$bucketOverride(ItemUsageContext ctx, CallbackInfoReturnable<ActionResult> cir) {
-        if (!(ctx.getWorld() instanceof ServerWorld world)) return;
-        if (!(ctx.getPlayer() instanceof ServerPlayerEntity player)) return;
+    private void gradient$bucketUseOverride(World world, PlayerEntity player, Hand hand,
+                                            CallbackInfoReturnable<TypedActionResult<ItemStack>> cir) {
 
-        ItemStack stack = ctx.getStack();
-        Hand hand = ctx.getHand();
-
+        ItemStack stack = player.getStackInHand(hand);
         if (!stack.isOf(Items.WATER_BUCKET)) return;
 
-        boolean shift = player.isSneaking();
+        if (world.isClient) {
+            cir.setReturnValue(TypedActionResult.success(stack, true)); // clientSuccess = true
+            return;
+        }
 
-        BlockPos clickedPos = ctx.getBlockPos();
-        Direction side = ctx.getSide();
+        ServerWorld serverWorld = (ServerWorld) world;
+        ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
+
+        BlockHitResult hit = ItemRaycastAccessor.gradient$invokeRaycast(world, player, RaycastContext.FluidHandling.NONE);
+        if (hit.getType() != HitResult.Type.BLOCK) {
+            cir.setReturnValue(TypedActionResult.pass(stack));
+            return;
+        }
+
+        BlockPos clickedPos = hit.getBlockPos();
+        Direction side = hit.getSide();
         BlockState clickedState = world.getBlockState(clickedPos);
 
         BlockPos targetPos = WaterHooks.isWaterReplaceable(clickedState)
                 ? clickedPos
                 : clickedPos.offset(side);
 
-        int units = GradientBucketData.getUnits(stack);
-        if (units <= 0) {
-            player.setStackInHand(hand, new ItemStack(Items.BUCKET));
-            cir.setReturnValue(ActionResult.SUCCESS);
-            return;
-        }
-
+        int units = BucketData.getUnits(stack);
+        boolean shift = serverPlayer.isSneaking();
         int req = shift ? 1 : units;
 
-        int placed = WaterHooks.tryInsert(world, targetPos, req);
-
+        int placed = WaterHooks.tryInsert(serverWorld, targetPos, req);
         if (placed <= 0) {
-            cir.setReturnValue(ActionResult.FAIL);
+            cir.setReturnValue(TypedActionResult.fail(stack));
             return;
         }
 
-        int remaining = units - placed;
-
-        boolean creative = player.getAbilities().creativeMode;
-
+        boolean creative = serverPlayer.getAbilities().creativeMode;
         if (!creative) {
+            int remaining = units - placed;
             if (remaining <= 0) {
-                player.setStackInHand(hand, new ItemStack(Items.BUCKET));
+                serverPlayer.setStackInHand(hand, new ItemStack(Items.BUCKET));
             } else {
-                GradientBucketData.setUnits(stack, remaining);
-                player.setStackInHand(hand, stack);
+                BucketData.setUnits(stack, remaining);
             }
         }
 
-        cir.setReturnValue(ActionResult.SUCCESS);
-    }
-
-    private static final class GradientBucketData {
-        private static final String KEY = "gradient_water_units";
-
-        static int getUnits(ItemStack stack) {
-            if (stack.getNbt() == null) return 14;
-            return stack.getNbt().contains(KEY) ? stack.getNbt().getInt(KEY) : 14;
-        }
-
-        static void setUnits(ItemStack stack, int units) {
-            if (units > WaterRegion.MAX_LEVEL) units = WaterRegion.MAX_LEVEL;
-            if (units < 0) units = 0;
-            stack.getOrCreateNbt().putInt(KEY, units);
-        }
+        cir.setReturnValue(TypedActionResult.success(serverPlayer.getStackInHand(hand)));
     }
 }
