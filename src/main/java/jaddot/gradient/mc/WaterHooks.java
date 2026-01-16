@@ -11,7 +11,6 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkStatus;
 
 import java.util.List;
-import java.util.Set;
 
 public class WaterHooks {
 
@@ -28,6 +27,23 @@ public class WaterHooks {
             manager.injectWater(world, pos, amount);
         }
     }
+
+    public static int tryInsert(ServerWorld world, BlockPos pos, int req) {
+        if (req <= 0) return 0;
+
+        if (!isWaterReplaceable(world.getBlockState(pos))) return 0;
+
+        WaterRegionManager manager = getManager(world);
+
+        int level = manager.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
+        int cap = 16 - level;
+        if (cap <= 0) return 0;
+
+        int placed = Math.min(req, cap);
+        onWaterPlaced(world, pos, placed);
+        return placed;
+    }
+
 
     public static void onBlockStateChanged(ServerWorld world, BlockPos pos, BlockState oldState, BlockState newState) {
         WaterRegionManager manager = getManager(world);

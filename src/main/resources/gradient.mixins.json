@@ -7,7 +7,8 @@
 		"PlaceMixin",
 		"PistonMixin",
 		"FlowableFluidMixin",
-		"FluidScheduledTickMixin"
+		"FluidScheduledTickMixin",
+		"BucketItemMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
