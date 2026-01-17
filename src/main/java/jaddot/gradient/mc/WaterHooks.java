@@ -1,10 +1,10 @@
 package jaddot.gradient.mc;
 
-import jaddot.gradient.ModBlocks;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
 import jaddot.gradient.world.WaterRegionManager;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -150,7 +150,7 @@ public class WaterHooks {
 
     public static boolean isWaterReplaceable(BlockState state) {
         return state.isAir() ||
-               state.isOf(ModBlocks.WATER_LAYER) ||
+               state.isOf(Blocks.WATER) ||
                state.isReplaceable();
     }
 

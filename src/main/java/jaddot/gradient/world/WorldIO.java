@@ -1,6 +1,5 @@
 package jaddot.gradient.world;
 
-import jaddot.gradient.ModBlocks;
 import jaddot.gradient.mc.BlockWriteGuard;
 import jaddot.gradient.sim.WaterRegion;
 import net.minecraft.block.Blocks;
@@ -78,7 +77,7 @@ public class WorldIO {
                         var state = world.getBlockState(pos);
 
                         if (solidHere) {
-                            if (state.isOf(Blocks.WATER) || state.isOf(ModBlocks.WATER_LAYER)) {
+                            if (state.isOf(Blocks.WATER)) {
                                 world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
                             }
                             continue;
@@ -89,7 +88,7 @@ public class WorldIO {
                                 world.setBlockState(pos, Blocks.WATER.getDefaultState(), 2);
                             }
                         } else {
-                            if (state.isOf(Blocks.WATER) || state.isOf(ModBlocks.WATER_LAYER)) {
+                            if (state.isOf(Blocks.WATER)) {
                                 world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
                             }
                         }

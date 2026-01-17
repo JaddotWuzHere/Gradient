@@ -4,6 +4,7 @@ import jaddot.gradient.sim.WaterActivation;
 import jaddot.gradient.sim.WaterDeltaSink;
 import jaddot.gradient.sim.WaterQuery;
 import jaddot.gradient.sim.WaterRegion;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.Set;
 public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActivation {
     private final RegionGrid grid;
     private final Set<RegionKey> activeRegions;
+    private ServerWorld world;
 
     public RegionOperations(RegionGrid grid, Set<RegionKey> activeRegions) {
         this.grid = grid;
@@ -149,6 +151,11 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
         activateRegion(key);
     }
 
+    @Override
+    public boolean isOutOfWorld(int worldX, int worldY, int worldZ) {
+        return worldY < world.getBottomY();
+    }
+
     public WaterRegion getOrCreateActiveRegion(RegionKey key) {
         boolean wasLoaded = grid.isRegionLoaded(key);
         WaterRegion region = grid.getOrCreateRegion(key);
@@ -252,5 +259,9 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
 
         if (isSolidAt(up.getX(), up.getY(), up.getZ())) return null;
         return up;
+    }
+
+    public void setWorld(ServerWorld world) {
+        this.world = world;
     }
 }

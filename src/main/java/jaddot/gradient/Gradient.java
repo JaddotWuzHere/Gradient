@@ -1,6 +1,5 @@
 package jaddot.gradient;
 
-import jaddot.gradient.mc.DevControls;
 import jaddot.gradient.mc.WaterHooks;
 import net.fabricmc.api.ModInitializer;
 
@@ -16,13 +15,7 @@ public class Gradient implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		LOGGER.info("Gradient initializing");
-
-		ModBlocks.register();
-
 		ServerTickEvents.END_WORLD_TICK.register(WaterHooks::onWorldTick);
-
-		// DEV ONLY STUFF
-		DevControls.register();
 	}
 
 }

@@ -36,6 +36,8 @@ public class WaterRegionManager {
     }
 
     public void tick(ServerWorld world) {
+        ops.setWorld(world);
+
         // simulation speed
         if ((world.getTime() % 2L) != 0L) {
             return;

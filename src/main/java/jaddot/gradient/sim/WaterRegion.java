@@ -274,11 +274,17 @@ public class WaterRegion {
         boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
 
         int t = computeVerticalTransfer(outEffectiveLevel, inEffectiveLevel, inSolid);
+
         if (t == 0) return false;
 
+        if (query.isOutOfWorld(worldNx, worldNy, worldNz)) {
+            t = Math.min(outEffectiveLevel, MAX_DOWNWARD_MOVEMENT);
+            sink.add(worldCx, worldCy, worldCz, -t);
+        }
+
         moveWater(worldCx, worldCy, worldCz,
-                worldNx, worldNy, worldNz,
-                t, c, sink, query);
+            worldNx, worldNy, worldNz,
+            t, c, sink, query);
         return true;
     }
 

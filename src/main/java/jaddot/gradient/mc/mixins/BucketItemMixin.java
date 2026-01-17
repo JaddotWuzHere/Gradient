@@ -56,7 +56,7 @@ public class BucketItemMixin {
                 : clicked.offset(side);
 
         if (world.isClient()) {
-            TypedActionResult.success(stack, true);
+            cir.setReturnValue(TypedActionResult.success(stack, true));
             return;
         }
 
@@ -84,8 +84,16 @@ public class BucketItemMixin {
             BucketData.setUnits(filled, pickedUp);
 
             if (!sp.getAbilities().creativeMode) {
-                sp.setStackInHand(hand, filled);
-                cir.setReturnValue(TypedActionResult.success(filled, false));
+                if (stack.getCount() == 1) {
+                    sp.setStackInHand(hand, filled);
+                    cir.setReturnValue(TypedActionResult.success(filled, false));
+                }
+                else {
+                    stack.decrement(1);
+                    boolean inserted = player.getInventory().insertStack(filled);
+                    if (!inserted) player.dropItem(filled, false);
+                    cir.setReturnValue(TypedActionResult.success(stack, false));
+                }
             } else {
                 cir.setReturnValue(TypedActionResult.success(stack, false));
             }
