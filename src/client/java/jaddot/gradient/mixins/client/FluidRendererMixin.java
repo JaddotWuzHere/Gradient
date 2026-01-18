@@ -72,15 +72,4 @@ public class FluidRendererMixin {
         if (h != null) cir.setReturnValue(h);
     }
 
-    @Inject(
-            method = "calculateFluidHeight(Lnet/minecraft/world/BlockRenderView;Lnet/minecraft/fluid/Fluid;FFFLnet/minecraft/util/math/BlockPos;)F",
-            at = @At("HEAD"),
-            cancellable = true
-    )
-    private void gradient$calculateFluidHeight(BlockRenderView world, Fluid fluid, float a, float b, float c,
-                                               BlockPos pos, CallbackInfoReturnable<Float> cir) {
-        Float h = gradientHeight(world, fluid, pos, null);
-        if (h != null) cir.setReturnValue(h);
-    }
-
 }
