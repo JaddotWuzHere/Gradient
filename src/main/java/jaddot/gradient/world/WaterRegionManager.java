@@ -1,5 +1,6 @@
 package jaddot.gradient.world;
 
+import jaddot.gradient.net.GradientServerNetworking;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
 import net.minecraft.server.world.ServerWorld;
@@ -53,6 +54,7 @@ public class WaterRegionManager {
             worldIO.syncSolids(world, key, region);
             boolean stillActive = region.step(ops, ops, ops);
             worldIO.applyRegionToWorld(world, key, region);
+            GradientServerNetworking.sendRegionSnapshot(world, grid, key, region);
             if (stillActive) activeRegions.add(key);
 
             // save snapshot

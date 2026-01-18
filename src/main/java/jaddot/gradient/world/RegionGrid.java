@@ -22,16 +22,13 @@ public class RegionGrid {
     }
 
     public RegionKey getRegionKey(int worldX, int worldY, int worldZ) {
-        int rx = Math.floorDiv(worldX, REGION_SIZE);
-        int ry = Math.floorDiv(worldY, REGION_SIZE);
-        int rz = Math.floorDiv(worldZ, REGION_SIZE);
-        return new RegionKey(rx, ry, rz);
+        return RegionMath.keyOf(worldX, worldY, worldZ);
     }
 
     public BlockPos getRegionOrigin(RegionKey key) {
-        int originX = key.rx * REGION_SIZE;
-        int originY = key.ry * REGION_SIZE;
-        int originZ = key.rz * REGION_SIZE;
+        int originX = key.rx * RegionMath.REGION_SIZE;
+        int originY = key.ry * RegionMath.REGION_SIZE;
+        int originZ = key.rz * RegionMath.REGION_SIZE;
         return new BlockPos(originX, originY, originZ);
     }
 
@@ -86,12 +83,10 @@ public class RegionGrid {
     }
 
     public RegionAddress addressOf(int worldX, int worldY, int worldZ) {
-        RegionKey key = getRegionKey(worldX, worldY, worldZ);
-
-        int lx = Math.floorMod(worldX, REGION_SIZE);
-        int ly = Math.floorMod(worldY, REGION_SIZE);
-        int lz = Math.floorMod(worldZ, REGION_SIZE);
-
+        RegionKey key = RegionMath.keyOf(worldX, worldY, worldZ);
+        int lx = RegionMath.lx(worldX);
+        int ly = RegionMath.ly(worldY);
+        int lz = RegionMath.lz(worldZ);
         return new RegionAddress(key, lx, ly, lz);
     }
 

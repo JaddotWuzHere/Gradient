@@ -16,6 +16,7 @@ public class Gradient implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Gradient initializing");
 		ServerTickEvents.END_WORLD_TICK.register(WaterHooks::onWorldTick);
+
 	}
 
 }
