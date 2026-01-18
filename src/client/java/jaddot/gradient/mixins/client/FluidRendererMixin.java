@@ -40,13 +40,11 @@ public class FluidRendererMixin {
             return h;
         }
 
-        // --- IMPORTANT PART: fallback computed here, NOT null ---
         FluidState fs = fluidStateMaybe;
         if (fs == null) fs = view.getFluidState(pos);
 
-        // If it's actually water, use vanilla height calculation so neighbors match.
         if (!fs.isEmpty() && (fs.getFluid() == Fluids.WATER || fs.getFluid() == Fluids.FLOWING_WATER)) {
-            return fs.getHeight(view, pos); // returns [0..1]
+            return fs.getHeight(view, pos);
         }
 
         return null;
@@ -57,7 +55,7 @@ public class FluidRendererMixin {
             at = @At("HEAD"),
             cancellable = true
     )
-    private void gradient_getFluidHeight3(BlockRenderView world, Fluid fluid, BlockPos pos, CallbackInfoReturnable<Float> cir) {
+    private void gradient$getFluidHeight3(BlockRenderView world, Fluid fluid, BlockPos pos, CallbackInfoReturnable<Float> cir) {
         Float h = gradientHeight(world, fluid, pos, null);
         if (h != null) cir.setReturnValue(h);
     }
@@ -67,7 +65,7 @@ public class FluidRendererMixin {
             at = @At("HEAD"),
             cancellable = true
     )
-    private void gradient_getFluidHeight5(BlockRenderView world, Fluid fluid, BlockPos pos,
+    private void gradient$getFluidHeight5(BlockRenderView world, Fluid fluid, BlockPos pos,
                                           BlockState state, FluidState fluidState,
                                           CallbackInfoReturnable<Float> cir) {
         Float h = gradientHeight(world, fluid, pos, fluidState);
