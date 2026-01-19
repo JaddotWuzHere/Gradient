@@ -15,6 +15,7 @@ public class WaterRegion {
     private final int size;
     private final int[][][] levels;
     private final int[][][] deltas;
+    private final boolean[][][] falling;
 
     private final boolean[][][] solids;
 
@@ -57,6 +58,8 @@ public class WaterRegion {
 
         levels = new int[size][size][size];
         deltas = new int[size][size][size];
+
+        falling = new boolean[size][size][size];
 
         solids = new boolean[size][size][size];
 
@@ -116,6 +119,27 @@ public class WaterRegion {
                     if (level < 0) level = 0;
                     if (level > MAX_LEVEL) level = MAX_LEVEL;
                     flattened[i] = (byte) level;
+                    i++;
+                }
+            }
+        }
+        return flattened;
+    }
+
+    public byte[] toFlatPackedLevels() {
+        byte[] flattened = new byte[size * size * size];
+        int i = 0;
+        for (int x = 0; x < size; x++) {
+            for (int y = 0; y < size; y++) {
+                for (int z = 0; z < size; z++) {
+                    int level = levels[x][y][z];
+                    if (level < 0) level = 0;
+                    if (level > MAX_LEVEL) level = MAX_LEVEL;
+
+                    int packed = (level & 0x1F);
+                    if (falling[x][y][z]) packed |= 0x20;
+
+                    flattened[i] = (byte) packed;
                     i++;
                 }
             }
@@ -202,6 +226,7 @@ public class WaterRegion {
                     if (d != 0) {
                         levels[x][y][z] += d;
                         deltas[x][y][z] = 0;
+                        falling[x][y][z] = false;
                         any = true;
 
                         if (!activeCells[x][y][z]) {
@@ -264,27 +289,30 @@ public class WaterRegion {
             WaterDeltaSink sink,
             WaterQuery query
     ) {
-        int outEffectiveLevel = query.getEffectiveLevel(worldCx, worldCy, worldCz);
+        int outLevel = query.getBaseLevel(worldCx, worldCy, worldCz);
 
         int worldNx = worldCx;
         int worldNy = worldCy - 1;
         int worldNz = worldCz;
 
-        int inEffectiveLevel = query.getEffectiveLevel(worldNx, worldNy, worldNz);
+        int inLevel = query.getBaseLevel(worldNx, worldNy, worldNz);
         boolean inSolid = query.isSolidAt(worldNx, worldNy, worldNz);
 
-        int t = computeVerticalTransfer(outEffectiveLevel, inEffectiveLevel, inSolid);
+        int t = computeVerticalTransfer(outLevel, inLevel, inSolid);
 
         if (t == 0) return false;
 
         if (query.isOutOfWorld(worldNx, worldNy, worldNz)) {
-            t = Math.min(outEffectiveLevel, MAX_DOWNWARD_MOVEMENT);
+            t = Math.min(outLevel, MAX_DOWNWARD_MOVEMENT);
             sink.add(worldCx, worldCy, worldCz, -t);
         }
 
         moveWater(worldCx, worldCy, worldCz,
             worldNx, worldNy, worldNz,
             t, c, sink, query);
+
+        falling[c.x][c.y][c.z] = true;
+
         return true;
     }
 
@@ -307,7 +335,7 @@ public class WaterRegion {
             WaterDeltaSink sink,
             WaterQuery query
     ) {
-        int centerLevel = query.getEffectiveLevel(worldCx, worldCy, worldCz);
+        int centerLevel = query.getBaseLevel(worldCx, worldCy, worldCz);
         if (centerLevel <= 0) return;
 
         int[] wx = new int[8];
@@ -343,7 +371,7 @@ public class WaterRegion {
                 continue;
             }
 
-            int nLevel = query.getEffectiveLevel(worldNx, worldNy, worldNz);
+            int nLevel = query.getBaseLevel(worldNx, worldNy, worldNz);
             if (nLevel >= MAX_LEVEL) {
                 continue;
             }
@@ -431,8 +459,8 @@ public class WaterRegion {
             WaterDeltaSink sink,
             WaterQuery query
     ) {
-        int source      = query.getEffectiveLevel(worldFx, worldFy, worldFz);
-        int destination = query.getEffectiveLevel(worldTx, worldTy, worldTz);
+        int source = query.getBaseLevel(worldFx, worldFy, worldFz);
+        int destination = query.getBaseLevel(worldTx, worldTy, worldTz);
 
         int destinationRoom = MAX_LEVEL - destination;
         int safeAmount = Math.min(amount, source);

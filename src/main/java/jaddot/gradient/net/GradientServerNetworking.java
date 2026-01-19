@@ -19,7 +19,7 @@ public final class GradientServerNetworking {
     private GradientServerNetworking() {}
 
     public static void sendRegionSnapshot(ServerWorld world, RegionGrid grid, RegionKey key, WaterRegion region) {
-        byte[] flat = region.toFlatLevels();
+        byte[] flat = region.toFlatPackedLevels();
 
         BlockPos origin = grid.getRegionOrigin(key);
         int size = grid.getRegionSize();

@@ -72,6 +72,22 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
     }
 
     @Override
+    public int getBaseLevel(int worldX, int worldY, int worldZ) {
+        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
+
+        RegionKey key = address.key();
+        WaterRegion region = grid.getLoadedRegion(key);
+
+        if (region == null) return 0;
+
+        int localX = address.lx();
+        int localY = address.ly();
+        int localZ = address.lz();
+
+        return region.getLevel(localX, localY, localZ);
+    }
+
+    @Override
     public boolean isSolidAt(int worldX, int worldY, int worldZ) {
         RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
 

@@ -29,8 +29,23 @@ public class FluidRendererMixin {
                 : (MinecraftClient.getInstance() != null ? MinecraftClient.getInstance().world : null);
 
         int level = 0;
+        boolean falling = false;
         if (clientWorld != null) {
-            level = ClientWaterLevelCache.getLevel(clientWorld, pos.getX(), pos.getY(), pos.getZ());
+            int x = pos.getX(), y = pos.getY(), z = pos.getZ();
+            level = ClientWaterLevelCache.getLevel(clientWorld, x, y, z);
+            falling = ClientWaterLevelCache.isFalling(clientWorld, x, y, z);
+
+            if (level > 0 && falling) {
+                // Only render full-height if there is water above (continuous falling column)
+                // Avoids making the topmost falling segment full-height.
+                if (y + 1 < clientWorld.getTopY()) {
+                    int above = ClientWaterLevelCache.getLevel(clientWorld, x, y + 1, z);
+                    if (above > 0) {
+                        return 1.0f;
+                    }
+                }
+                // otherwise fall through to fractional height
+            }
         }
 
         if (level > 0) {
@@ -49,6 +64,7 @@ public class FluidRendererMixin {
 
         return null;
     }
+
 
     @Inject(
             method = "getFluidHeight(Lnet/minecraft/world/BlockRenderView;Lnet/minecraft/fluid/Fluid;Lnet/minecraft/util/math/BlockPos;)F",

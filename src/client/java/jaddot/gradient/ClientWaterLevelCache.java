@@ -34,8 +34,30 @@ public final class ClientWaterLevelCache {
         int idx = RegionMath.flatIndex(lx, ly, lz);
         if (idx < 0 || idx >= flat.length) return 0;
 
-        return flat[idx] & 0xFF;
+        int packed = flat[idx] & 0xFF;
+        return packed & 0x1F;
     }
+
+    public static boolean isFalling(ClientWorld world, int wx, int wy, int wz) {
+        Identifier dimId = world.getRegistryKey().getValue();
+        Map<RegionKey, byte[]> dimMap = BY_DIM.get(dimId);
+        if (dimMap == null) return false;
+
+        RegionKey key = RegionMath.keyOf(wx, wy, wz);
+        byte[] flat = dimMap.get(key);
+        if (flat == null) return false;
+
+        int lx = RegionMath.lx(wx);
+        int ly = RegionMath.ly(wy);
+        int lz = RegionMath.lz(wz);
+
+        int idx = RegionMath.flatIndex(lx, ly, lz);
+        if (idx < 0 || idx >= flat.length) return false;
+
+        int packed = flat[idx] & 0xFF;
+        return (packed & 0x20) != 0;
+    }
+
 
     public static void clearAll() {
         BY_DIM.clear();
