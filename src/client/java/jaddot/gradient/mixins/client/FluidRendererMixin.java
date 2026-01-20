@@ -36,16 +36,22 @@ public class FluidRendererMixin {
             falling = ClientWaterLevelCache.isFalling(clientWorld, x, y, z);
 
             if (level > 0 && falling) {
-                // Only render full-height if there is water above (continuous falling column)
-                // Avoids making the topmost falling segment full-height.
                 if (y + 1 < clientWorld.getTopY()) {
                     int above = ClientWaterLevelCache.getLevel(clientWorld, x, y + 1, z);
                     if (above > 0) {
                         return 1.0f;
                     }
                 }
-                // otherwise fall through to fractional height
             }
+
+            if (y + 1 < clientWorld.getTopY()) {
+                int aboveLevel = ClientWaterLevelCache.getLevel(clientWorld, x, y + 1, z);
+                boolean aboveFalling = ClientWaterLevelCache.isFalling(clientWorld, x, y + 1, z);
+                if (aboveFalling && aboveLevel > 0) {
+                    return 1.0f;
+                }
+            }
+
         }
 
         if (level > 0) {
