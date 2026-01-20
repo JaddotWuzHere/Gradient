@@ -11,6 +11,9 @@ public class WaterRegion {
     public static final int MAX_DOWNWARD_MOVEMENT = 4;
     public static final int SEEK = 2;
 
+    private static final int COHESION_RADIUS = 1;
+    private static final int COHESION_MAX = 8;
+
     private final int originX, originY, originZ;
     private final int size;
     private final int[][][] levels;
@@ -342,7 +345,9 @@ public class WaterRegion {
         int[] wy = new int[8];
         int[] wz = new int[8];
         int[] neighLevels = new int[8];
+        int[] cohesion = new int[8];
         int count = 0;
+
 
         for (int[] off : ALL_OFFSETS) {
             int dx = off[0];
@@ -380,20 +385,13 @@ public class WaterRegion {
             wy[count] = worldNy;
             wz[count] = worldNz;
             neighLevels[count] = nLevel;
+            cohesion[count] = cohesionScore(worldNx, worldNy, worldNz, query);
             count++;
         }
 
         if (count == 0) return;
 
-        for (int i = count - 1; i > 0; i--) {
-            int j = rand.nextInt(i + 1);
-
-            int tmpX = wx[i]; wx[i] = wx[j]; wx[j] = tmpX;
-            int tmpY = wy[i]; wy[i] = wy[j]; wy[j] = tmpY;
-            int tmpZ = wz[i]; wz[i] = wz[j]; wz[j] = tmpZ;
-
-            int tmpL = neighLevels[i]; neighLevels[i] = neighLevels[j]; neighLevels[j] = tmpL;
-        }
+        cohesionBiasedShuffle(wx, wy, wz, neighLevels, cohesion, count);
 
         int centerDist = distToNearestLedge(worldCx, worldCy, worldCz, query);
 
@@ -529,6 +527,73 @@ public class WaterRegion {
                     nextActive.add(new Cell(nx, ny, nz));
                 }
             }
+        }
+    }
+
+    private int cohesionScore(int wx, int wy, int wz, WaterQuery query) {
+        int score = 0;
+
+        for (int[] off : ALL_OFFSETS) {
+            int nx = wx + off[0];
+            int nz = wz + off[2];
+
+            if (!query.isRegionLoadedAt(nx, wy, nz)) continue;
+            if (query.isSolidAt(nx, wy, nz)) continue;
+
+            if (query.getBaseLevel(nx, wy, nz) > 0) score++;
+        }
+
+        return score;
+    }
+
+    private void cohesionBiasedShuffle(
+            int[] wx, int[] wy, int[] wz, int[] neighLevels, int[] cohesion, int count
+    ) {
+        int[][] bucketIdx = new int[COHESION_MAX + 1][count];
+        int[] bucketSize = new int[COHESION_MAX + 1];
+
+        for (int i = 0; i < count; i++) {
+            int s = cohesion[i];
+            if (s < 0) s = 0;
+            if (s > COHESION_MAX) s = COHESION_MAX;
+            bucketIdx[s][bucketSize[s]++] = i;
+        }
+
+        for (int s = 0; s <= COHESION_MAX; s++) {
+            int n = bucketSize[s];
+            for (int i = n - 1; i > 0; i--) {
+                int j = rand.nextInt(i + 1);
+                int tmp = bucketIdx[s][i];
+                bucketIdx[s][i] = bucketIdx[s][j];
+                bucketIdx[s][j] = tmp;
+            }
+        }
+
+        int[] nwx = new int[count];
+        int[] nwy = new int[count];
+        int[] nwz = new int[count];
+        int[] nlv = new int[count];
+        int[] nco = new int[count];
+
+        int k = 0;
+        for (int s = COHESION_MAX; s >= 0; s--) {
+            for (int bi = 0; bi < bucketSize[s]; bi++) {
+                int idx = bucketIdx[s][bi];
+                nwx[k] = wx[idx];
+                nwy[k] = wy[idx];
+                nwz[k] = wz[idx];
+                nlv[k] = neighLevels[idx];
+                nco[k] = cohesion[idx];
+                k++;
+            }
+        }
+
+        for (int i = 0; i < count; i++) {
+            wx[i] = nwx[i];
+            wy[i] = nwy[i];
+            wz[i] = nwz[i];
+            neighLevels[i] = nlv[i];
+            cohesion[i] = nco[i];
         }
     }
 }

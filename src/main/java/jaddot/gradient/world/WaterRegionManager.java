@@ -40,7 +40,7 @@ public class WaterRegionManager {
         ops.setWorld(world);
 
         // simulation speed
-        if ((world.getTime() % 3L) != 0L) {
+        if ((world.getTime() % 2L) != 0L) {
             return;
         }
 
