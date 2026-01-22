@@ -65,7 +65,7 @@ public class FluidRendererMixin {
         if (fs == null) fs = view.getFluidState(pos);
 
         if (!fs.isEmpty() && (fs.getFluid() == Fluids.WATER || fs.getFluid() == Fluids.FLOWING_WATER)) {
-            return fs.getHeight(view, pos);
+            return 1.0f / 16.0f;
         }
 
         return null;

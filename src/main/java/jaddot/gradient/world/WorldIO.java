@@ -178,7 +178,7 @@ public class WorldIO {
         HashSet<BlockPos> touched = smooth(pos);
 
         for (BlockPos blockPos : touched) {
-            wakeAround(blockPos);
+            disturbAround(blockPos);
         }
     }
 

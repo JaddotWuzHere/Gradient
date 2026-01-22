@@ -2,6 +2,7 @@ package jaddot.gradient.mc.mixins;
 
 import jaddot.gradient.mc.BucketData;
 import jaddot.gradient.mc.WaterHooks;
+import jaddot.gradient.sim.WaterSimState;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BucketItem;
@@ -117,6 +118,8 @@ public class BucketItemMixin {
             cir.setReturnValue(TypedActionResult.fail(stack));
             return;
         }
+
+        WaterSimState.get(serverWorld).getManager().disturbAround(target);
 
         if (!sp.getAbilities().creativeMode) {
             int remaining = units - placed;

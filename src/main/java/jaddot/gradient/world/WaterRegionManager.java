@@ -53,8 +53,8 @@ public class WaterRegionManager {
 
             worldIO.syncSolids(world, key, region);
             boolean stillActive = region.step(ops, ops, ops);
-            worldIO.applyRegionToWorld(world, key, region);
             GradientServerNetworking.sendRegionSnapshot(world, grid, key, region);
+            worldIO.applyRegionToWorld(world, key, region);
             if (stillActive) activeRegions.add(key);
 
             // save snapshot
