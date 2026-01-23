@@ -470,14 +470,14 @@ public class WaterRegion {
 
             touched.add(fromCell);
 
-            int toLocalX = worldTx - originX;
-            int toLocalY = worldTy - originY;
-            int toLocalZ = worldTz - originZ;
+            int localX = worldTx - originX;
+            int localY = worldTy - originY;
+            int localZ = worldTz - originZ;
 
-            if (0 <= toLocalX && toLocalX < size &&
-                    0 <= toLocalY && toLocalY < size &&
-                    0 <= toLocalZ && toLocalZ < size) {
-                touched.add(new Cell(toLocalX, toLocalY, toLocalZ));
+            if (0 <= localX && localX < size &&
+                0 <= localY && localY < size &&
+                0 <= localZ && localZ < size) {
+                touched.add(new Cell(localX, localY, localZ));
             }
         }
     }
@@ -495,9 +495,14 @@ public class WaterRegion {
                 int ny = c.y;
                 int nz = c.z + off[2];
 
+                int worldNx = originX + nx;
+                int worldNy = originY + ny;
+                int worldNz = originZ + nz;
+
                 if (nx < 0 || nx >= size ||
-                        ny < 0 || ny >= size ||
-                        nz < 0 || nz >= size) {
+                    ny < 0 || ny >= size ||
+                    nz < 0 || nz >= size) {
+                    activation.markActiveAt(worldNx, worldNy, worldNz);
                     continue;
                 }
 
