@@ -1,6 +1,7 @@
 package jaddot.gradient.mixins.client;
 
 import jaddot.gradient.ClientWaterLevelCache;
+import jaddot.gradient.mc.LevelMath;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.block.FluidRenderer;
@@ -18,9 +19,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(FluidRenderer.class)
 public class FluidRendererMixin {
 
-    private static final org.apache.logging.log4j.Logger GR_LOG =
-            org.apache.logging.log4j.LogManager.getLogger("GradientRender");
-
     private static Float gradientHeight(BlockRenderView view, Fluid fluid, BlockPos pos, FluidState fluidStateMaybe) {
         if (fluid != Fluids.WATER && fluid != Fluids.FLOWING_WATER) return null;
 
@@ -29,20 +27,9 @@ public class FluidRendererMixin {
                 : (MinecraftClient.getInstance() != null ? MinecraftClient.getInstance().world : null);
 
         int level = 0;
-        boolean falling = false;
+
         if (clientWorld != null) {
             int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-            level = ClientWaterLevelCache.getLevel(clientWorld, x, y, z);
-            falling = ClientWaterLevelCache.isFalling(clientWorld, x, y, z);
-
-            if (level > 0 && falling) {
-                if (y + 1 < clientWorld.getTopY()) {
-                    int above = ClientWaterLevelCache.getLevel(clientWorld, x, y + 1, z);
-                    if (above > 0) {
-                        return 1.0f;
-                    }
-                }
-            }
 
             if (y + 1 < clientWorld.getTopY()) {
                 int aboveLevel = ClientWaterLevelCache.getLevel(clientWorld, x, y + 1, z);
@@ -52,25 +39,22 @@ public class FluidRendererMixin {
                 }
             }
 
+            level = ClientWaterLevelCache.getLevel(clientWorld, x, y, z);
         }
 
         if (level > 0) {
-            float h = level / 16.0f;
-            if (h < 0f) h = 0f;
-            if (h > 1f) h = 1f;
-            return h;
+            return LevelMath.levelToBlockHeight(level);
         }
 
         FluidState fs = fluidStateMaybe;
         if (fs == null) fs = view.getFluidState(pos);
 
         if (!fs.isEmpty() && (fs.getFluid() == Fluids.WATER || fs.getFluid() == Fluids.FLOWING_WATER)) {
-            return 1.0f / 16.0f;
+            return LevelMath.levelToBlockHeight(1);
         }
 
         return null;
     }
-
 
     @Inject(
             method = "getFluidHeight(Lnet/minecraft/world/BlockRenderView;Lnet/minecraft/fluid/Fluid;Lnet/minecraft/util/math/BlockPos;)F",
@@ -93,5 +77,4 @@ public class FluidRendererMixin {
         Float h = gradientHeight(world, fluid, pos, fluidState);
         if (h != null) cir.setReturnValue(h);
     }
-
 }
