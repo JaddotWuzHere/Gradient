@@ -8,7 +8,6 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateManager;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -115,7 +114,7 @@ public class WaterSimState extends PersistentState {
     }
 
     public static class RegionSnapshot {
-        private final byte[] levels; // flattened 3d array
+        private final byte[] levels;
 
         public RegionSnapshot (byte[] levels) {
             this.levels = levels;

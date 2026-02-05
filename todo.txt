@@ -1,4 +1,7 @@
-- update water visuals by replacing how vanilla does it
+- clean code
 - fix bucket pickup ray trace thingy
+- replace naturally generated water
+- override any kind of vanilla water placement (bucket of fish, dispensers, etc)
+- override vanilla water block properties?
 - implement water flow
-- dispensers
+- implement movement slowdown depending on level of water

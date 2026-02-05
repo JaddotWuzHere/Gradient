@@ -11,7 +11,8 @@
 		"BucketItemMixin",
 		"ItemBarMixin",
 		"BucketTooltipMixin",
-		"ItemRaycastAccessor"
+		"ItemRaycastAccessor",
+		"EntitySimWaterMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

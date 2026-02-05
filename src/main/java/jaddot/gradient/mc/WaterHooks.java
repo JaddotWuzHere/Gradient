@@ -1,5 +1,6 @@
 package jaddot.gradient.mc;
 
+import jaddot.gradient.sim.WaterQuery;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
 import jaddot.gradient.world.WaterRegionManager;
@@ -210,4 +211,5 @@ public class WaterHooks {
     public static WaterRegionManager getManager(ServerWorld world) {
         return WaterSimState.get(world).getManager();
     }
+
 }
