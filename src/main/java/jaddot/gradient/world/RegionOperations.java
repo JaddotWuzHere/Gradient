@@ -26,13 +26,12 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
     public void add(int worldX, int worldY, int worldZ, int amount) {
         if (amount == 0) return;
 
-        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
-        RegionKey key = address.key();
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = getOrCreateActiveRegion(key);
 
-        int localX = address.lx();
-        int localY = address.ly();
-        int localZ = address.lz();
+        int localX = RegionMath.lx(worldX);
+        int localY = RegionMath.ly(worldY);
+        int localZ = RegionMath.lz(worldZ);
 
         int base = region.getLevel(localX, localY, localZ);
         int pending = region.getDelta(localX, localY, localZ);
@@ -56,16 +55,14 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
 
     @Override
     public int getEffectiveLevel(int worldX, int worldY, int worldZ) {
-        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
-
-        RegionKey key = address.key();
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
 
         if (region == null) return 0;
 
-        int localX = address.lx();
-        int localY = address.ly();
-        int localZ = address.lz();
+        int localX = RegionMath.lx(worldX);
+        int localY = RegionMath.ly(worldY);
+        int localZ = RegionMath.lz(worldZ);
 
         return region.getLevel(localX, localY, localZ) +
                region.getDelta(localX, localY, localZ);
@@ -73,50 +70,40 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
 
     @Override
     public int getBaseLevel(int worldX, int worldY, int worldZ) {
-        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
-
-        RegionKey key = address.key();
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
-
         if (region == null) return 0;
 
-        int localX = address.lx();
-        int localY = address.ly();
-        int localZ = address.lz();
+        int lx = RegionMath.lx(worldX);
+        int ly = RegionMath.ly(worldY);
+        int lz = RegionMath.lz(worldZ);
 
-        return region.getLevel(localX, localY, localZ);
+        return region.getLevel(lx, ly, lz);
     }
 
     @Override
     public boolean isSolidAt(int worldX, int worldY, int worldZ) {
-        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
-
-        RegionKey key = address.key();
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
+        if (region == null) return false;
 
-        if (region == null) {
-            return false;
-        }
+        int lx = RegionMath.lx(worldX);
+        int ly = RegionMath.ly(worldY);
+        int lz = RegionMath.lz(worldZ);
 
-        int localX = address.lx();
-        int localY = address.ly();
-        int localZ = address.lz();
-
-        return region.isSolid(localX, localY, localZ);
+        return region.isSolid(lx, ly, lz);
     }
 
     @Override
     public void markActiveAt(int worldX, int worldY, int worldZ) {
-        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
-
-        RegionKey key = address.key();
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = getOrCreateActiveRegion(key);
 
-        int localX = address.lx();
-        int localY = address.ly();
-        int localZ = address.lz();
+        int lx = RegionMath.lx(worldX);
+        int ly = RegionMath.ly(worldY);
+        int lz = RegionMath.lz(worldZ);
 
-        region.markCellActive(localX, localY, localZ);
+        region.markCellActive(lx, ly, lz);
         activateRegion(key);
     }
 
@@ -130,38 +117,36 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
     }
 
     public void removeWaterAt(int worldX, int worldY, int worldZ) {
-        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
-
-        RegionKey key = address.key();
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
-
         if (region == null) return; // shouldn't happen tho
 
-        int localX = address.lx();
-        int localY = address.ly();
-        int localZ = address.lz();
+        int lx = RegionMath.lx(worldX);
+        int ly = RegionMath.ly(worldY);
+        int lz = RegionMath.lz(worldZ);
 
-        region.setLevel(localX, localY, localZ, 0);
-        region.clearDelta(localX, localY, localZ);
-        region.markCellActive(localX, localY, localZ);
+        region.setLevel(lx, ly, lz, 0);
+        region.clearDelta(lx, ly, lz);
+        region.markCellActive(lx, ly, lz);
         activateRegion(key);
     }
 
     public void removeWaterAmount(int worldX, int worldY, int worldZ, int amount) {
-        RegionAddress address = grid.addressOf(worldX, worldY, worldZ);
+        if (amount <= 0) return;
 
-        RegionKey key = address.key();
+        RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
-
         if (region == null) return; // shouldn't happen tho
 
-        int localX = address.lx();
-        int localY = address.ly();
-        int localZ = address.lz();
+        int localX = RegionMath.lx(worldX);
+        int localY = RegionMath.ly(worldY);
+        int localZ = RegionMath.lz(worldZ);
 
         int level = getEffectiveLevel(worldX, worldY, worldZ);
 
-        region.setLevel(localX, localY, localZ, level - amount);
+        int newLevel = Math.max(0, level - amount);
+
+        region.setLevel(localX, localY, localZ, newLevel);
         region.clearDelta(localX, localY, localZ);
         region.markCellActive(localX, localY, localZ);
         activateRegion(key);

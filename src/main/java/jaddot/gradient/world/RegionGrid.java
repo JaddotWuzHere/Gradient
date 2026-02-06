@@ -95,17 +95,4 @@ public class RegionGrid {
     public WaterRegion getLoadedRegion(RegionKey key) {
         return regions.get(key);
     }
-
-    public RegionAddress addressOf(BlockPos pos) {
-        return addressOf(pos.getX(), pos.getY(), pos.getZ());
-    }
-
-    public RegionAddress addressOf(int worldX, int worldY, int worldZ) {
-        RegionKey key = getRegionKey(worldX, worldY, worldZ);
-        int lx = RegionMath.lx(worldX);
-        int ly = RegionMath.ly(worldY);
-        int lz = RegionMath.lz(worldZ);
-        return new RegionAddress(key, lx, ly, lz);
-    }
-
 }

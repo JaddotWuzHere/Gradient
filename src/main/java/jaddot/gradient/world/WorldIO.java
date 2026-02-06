@@ -100,16 +100,16 @@ public class WorldIO {
 
 
     public WaterRegion injectWater(ServerWorld world, BlockPos pos, int amount) {
-        RegionAddress address = grid.addressOf(pos);
+        RegionKey key = grid.getRegionKey(pos.getX(), pos.getY(), pos.getZ());
 
         boolean canFit = canFitColumnAmount(world, pos, amount);
         if (!canFit) {
-            return grid.getLoadedRegion(address.key());
+            return grid.getLoadedRegion(key);
         }
 
         applyColumnAmount(pos, amount);
 
-        return grid.getOrCreateRegion(address.key());
+        return grid.getOrCreateRegion(key);
     }
 
     private boolean canFitColumnAmount(ServerWorld world, BlockPos pos, int amount) {
@@ -146,14 +146,16 @@ public class WorldIO {
         int remaining = amount;
 
         while (remaining > 0) {
-            RegionAddress address = grid.addressOf(pos);
+            int wx = pos.getX();
+            int wy = pos.getY();
+            int wz = pos.getZ();
 
-            RegionKey key = address.key();
+            RegionKey key = grid.getRegionKey(wx, wy, wz);
             WaterRegion region = grid.getOrCreateRegion(key);
 
-            int localX = address.lx();
-            int localY = address.ly();
-            int localZ = address.lz();
+            int localX = RegionMath.lx(wx);
+            int localY = RegionMath.ly(wy);
+            int localZ = RegionMath.lz(wz);
 
             int base = region.getLevel(localX, localY, localZ);
             int pending = region.getDelta(localX, localY, localZ);
@@ -369,13 +371,17 @@ public class WorldIO {
     }
 
     private void touch(BlockPos pos, java.util.function.Function<RegionKey, WaterRegion> regionGetter) {
-        RegionAddress address = grid.addressOf(pos);
-        RegionKey key = address.key();
+        int wx = pos.getX(), wy = pos.getY(), wz = pos.getZ();
 
+        RegionKey key = grid.getRegionKey(wx, wy, wz);
         WaterRegion region = regionGetter.apply(key);
         if (region == null) return;
 
-        region.markCellActive(address.lx(), address.ly(), address.lz());
+        int lx = RegionMath.lx(wx);
+        int ly = RegionMath.ly(wy);
+        int lz = RegionMath.lz(wz);
+
+        region.markCellActive(lx, ly, lz);
         ops.activateRegion(key);
     }
 
