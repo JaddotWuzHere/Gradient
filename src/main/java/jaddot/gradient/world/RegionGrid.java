@@ -1,19 +1,23 @@
 package jaddot.gradient.world;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
 
 import java.util.HashMap;
 
 public class RegionGrid {
-    private static final int REGION_SIZE = 16;
+    private static final int REGION_SIZE = RegionMath.REGION_SIZE;
 
     private final HashMap<RegionKey, WaterRegion> regions;
+    private final Long2ObjectOpenHashMap<RegionKey> keyCache;
     private final WaterSimState save;
 
     public RegionGrid(WaterSimState save) {
         this.regions = new HashMap<>();
+        this.keyCache = new Long2ObjectOpenHashMap<>();
         this.save = save;
     }
 
@@ -22,7 +26,21 @@ public class RegionGrid {
     }
 
     public RegionKey getRegionKey(int worldX, int worldY, int worldZ) {
-        return RegionMath.keyOf(worldX, worldY, worldZ);
+        int rx = Math.floorDiv(worldX, REGION_SIZE);
+        int ry = Math.floorDiv(worldY, REGION_SIZE);
+        int rz = Math.floorDiv(worldZ, REGION_SIZE);
+        return internKey(rx, ry, rz);
+    }
+
+    private RegionKey internKey(int rx, int ry, int rz) {
+        long packed = ChunkSectionPos.asLong(rx, ry, rz);
+        RegionKey cached = keyCache.get(packed);
+
+        if (cached != null) return cached;
+        RegionKey created = new RegionKey(rx, ry, rz);
+        keyCache.put(packed, created);
+
+        return created;
     }
 
     public BlockPos getRegionOrigin(RegionKey key) {
@@ -83,7 +101,7 @@ public class RegionGrid {
     }
 
     public RegionAddress addressOf(int worldX, int worldY, int worldZ) {
-        RegionKey key = RegionMath.keyOf(worldX, worldY, worldZ);
+        RegionKey key = getRegionKey(worldX, worldY, worldZ);
         int lx = RegionMath.lx(worldX);
         int ly = RegionMath.ly(worldY);
         int lz = RegionMath.lz(worldZ);

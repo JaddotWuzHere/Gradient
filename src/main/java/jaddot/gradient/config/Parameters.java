@@ -8,4 +8,7 @@ public class Parameters {
     public static float invMaxLevel() {
         return 1.0f / (float) MAX_LEVEL;
     }
+
+    // Regions
+    public static int REGION_SIZE = 16;
 }

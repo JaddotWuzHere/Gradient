@@ -1,9 +1,11 @@
 package jaddot.gradient.world;
 
+import jaddot.gradient.config.Parameters;
+
 public final class RegionMath {
     private RegionMath() {}
 
-    public static final int REGION_SIZE = 16;
+    public static final int REGION_SIZE = Parameters.REGION_SIZE;
 
     public static RegionKey keyOf(int worldX, int worldY, int worldZ) {
         int rx = Math.floorDiv(worldX, REGION_SIZE);
