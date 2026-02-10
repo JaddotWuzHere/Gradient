@@ -10,7 +10,7 @@ public final class WaterLevelAccess {
     private static LevelGetter CLIENT_GETTER = null;
 
     public interface LevelGetter {
-        int getLevel(World world, int x, int y, int z);
+        int getLevel16(World world, int x, int y, int z);
     }
 
     public static void installClient(LevelGetter getter) {
@@ -20,6 +20,6 @@ public final class WaterLevelAccess {
     public static int getClientLevel16(World world, int x, int y, int z) {
         LevelGetter g = CLIENT_GETTER;
         if (g == null) return 0;
-        return g.getLevel(world, x, y, z);
+        return g.getLevel16(world, x, y, z);
     }
 }

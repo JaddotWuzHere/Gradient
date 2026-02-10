@@ -16,8 +16,8 @@ public class RegionKey {
 
         RegionKey other = (RegionKey) obj;
         return this.rx == other.rx &&
-               this.ry == other.ry &&
-               this.rz == other.rz;
+                this.ry == other.ry &&
+                this.rz == other.rz;
     }
 
     @Override

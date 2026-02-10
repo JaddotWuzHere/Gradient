@@ -65,7 +65,7 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
         int localZ = RegionMath.lz(worldZ);
 
         return region.getLevel(localX, localY, localZ) +
-               region.getDelta(localX, localY, localZ);
+                region.getDelta(localX, localY, localZ);
     }
 
     @Override

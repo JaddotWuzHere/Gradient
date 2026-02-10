@@ -1,9 +1,9 @@
 package jaddot.gradient.world;
 
 import jaddot.gradient.mc.BlockWriteGuard;
+import jaddot.gradient.mc.VanillaWaterBridge;
 import jaddot.gradient.sim.WaterRegion;
 import net.minecraft.block.Blocks;
-import net.minecraft.block.SnowBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
@@ -18,6 +18,8 @@ public class WorldIO {
     private final RegionGrid grid;
     private final RegionOperations ops;
 
+    private final BlockPos.Mutable tmp = new BlockPos.Mutable();
+
     public WorldIO(RegionGrid grid, RegionOperations ops) {
         this.grid = grid;
         this.ops = ops;
@@ -27,30 +29,31 @@ public class WorldIO {
         BlockPos origin = grid.getRegionOrigin(key);
         int size = grid.getRegionSize();
 
+        int ox = origin.getX();
+        int oy = origin.getY();
+        int oz = origin.getZ();
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+
         for (int x = 0; x < size; x++) {
+            int wx = ox + x;
             for (int y = 0; y < size; y++) {
+                int wy = oy + y;
                 for (int z = 0; z < size; z++) {
-                    int wx = origin.getX() + x;
-                    int wy = origin.getY() + y;
-                    int wz = origin.getZ() + z;
-                    BlockPos pos = new BlockPos(wx, wy, wz);
+                    int wz = oz + z;
+                    pos.set(wx, wy, wz);
 
                     var state = world.getBlockState(pos);
 
                     boolean isSolid =
                             !state.isAir() &&
-                            !state.isOf(Blocks.WATER) &&
-                            !state.isOf(Blocks.BUBBLE_COLUMN);
+                                    !state.isOf(Blocks.WATER) &&
+                                    !state.isOf(Blocks.BUBBLE_COLUMN);
 
                     region.setSolid(x, y, z, isSolid);
 
                     if (isSolid) {
-                        if (region.getLevel(x, y, z) != 0) {
-                            region.setLevel(x, y, z, 0);
-                        }
-                        if (region.getDelta(x, y, z) != 0) {
-                            region.clearDelta(x, y, z);
-                        }
+                        if (region.getLevel(x, y, z) != 0) region.setLevel(x, y, z, 0);
+                        if (region.getDelta(x, y, z) != 0) region.clearDelta(x, y, z);
                     }
                 }
             }
@@ -61,43 +64,37 @@ public class WorldIO {
         int size = grid.getRegionSize();
         BlockPos origin = grid.getRegionOrigin(key);
 
+        int ox = origin.getX();
+        int oy = origin.getY();
+        int oz = origin.getZ();
+
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+
         BlockWriteGuard.runGuarded(() -> {
             for (int x = 0; x < size; x++) {
+                int wx = ox + x;
                 for (int y = 0; y < size; y++) {
+                    int wy = oy + y;
                     for (int z = 0; z < size; z++) {
+                        int wz = oz + z;
+                        pos.set(wx, wy, wz);
 
                         int wl = region.getLevel(x, y, z);
                         boolean solidHere = region.isSolid(x, y, z);
 
-                        int wx = origin.getX() + x;
-                        int wy = origin.getY() + y;
-                        int wz = origin.getZ() + z;
-                        BlockPos pos = new BlockPos(wx, wy, wz);
-
-                        var state = world.getBlockState(pos);
-
                         if (solidHere) {
-                            if (state.isOf(Blocks.WATER)) {
+                            if (world.getBlockState(pos).isOf(Blocks.WATER)) {
                                 world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
                             }
                             continue;
                         }
 
-                        if (wl > 0) {
-                            if (!state.isOf(Blocks.WATER)) {
-                                world.setBlockState(pos, Blocks.WATER.getDefaultState(), 2);
-                            }
-                        } else {
-                            if (state.isOf(Blocks.WATER)) {
-                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
-                            }
-                        }
+                        VanillaWaterBridge.applyCell(world, pos, wl);
                     }
                 }
             }
         });
     }
-
 
     public WaterRegion injectWater(ServerWorld world, BlockPos pos, int amount) {
         RegionKey key = grid.getRegionKey(pos.getX(), pos.getY(), pos.getZ());
@@ -108,28 +105,35 @@ public class WorldIO {
         }
 
         applyColumnAmount(pos, amount);
-
         return grid.getOrCreateRegion(key);
     }
 
     private boolean canFitColumnAmount(ServerWorld world, BlockPos pos, int amount) {
         int remaining = amount;
 
+        int x = pos.getX();
+        int y = pos.getY();
+        int z = pos.getZ();
+
         int minY = world.getBottomY();
         int maxY = world.getTopY();
 
+        BlockPos.Mutable cursor = new BlockPos.Mutable();
+
         while (remaining > 0) {
-            int y = pos.getY();
             if (y < minY || y >= maxY) return false;
 
-            var state = world.getBlockState(pos);
-            boolean isSolid = !state.isAir() &&
-                    !state.isOf(Blocks.WATER);
-            if (isSolid) {
-                return false;
-            }
+            cursor.set(x, y, z);
+            var state = world.getBlockState(cursor);
 
-            int currentLevel = ops.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
+            boolean isSolid =
+                    !state.isAir() &&
+                            !state.isOf(Blocks.WATER) &&
+                            !state.isOf(Blocks.BUBBLE_COLUMN);
+
+            if (isSolid) return false;
+
+            int currentLevel = ops.getEffectiveLevel(x, y, z);
             int capacity = WaterRegion.MAX_LEVEL - currentLevel;
 
             if (capacity > 0) {
@@ -137,7 +141,7 @@ public class WorldIO {
                 remaining -= usedHere;
             }
 
-            pos = pos.up();
+            y += 1;
         }
         return true;
     }
@@ -145,17 +149,17 @@ public class WorldIO {
     private void applyColumnAmount(BlockPos pos, int amount) {
         int remaining = amount;
 
-        while (remaining > 0) {
-            int wx = pos.getX();
-            int wy = pos.getY();
-            int wz = pos.getZ();
+        int x = pos.getX();
+        int y = pos.getY();
+        int z = pos.getZ();
 
-            RegionKey key = grid.getRegionKey(wx, wy, wz);
+        while (remaining > 0) {
+            RegionKey key = grid.getRegionKey(x, y, z);
             WaterRegion region = grid.getOrCreateRegion(key);
 
-            int localX = RegionMath.lx(wx);
-            int localY = RegionMath.ly(wy);
-            int localZ = RegionMath.lz(wz);
+            int localX = RegionMath.lx(x);
+            int localY = RegionMath.ly(y);
+            int localZ = RegionMath.lz(z);
 
             int base = region.getLevel(localX, localY, localZ);
             int pending = region.getDelta(localX, localY, localZ);
@@ -167,11 +171,12 @@ public class WorldIO {
 
                 region.setLevel(localX, localY, localZ, base + usedHere);
 
-                disturb(pos);
+                disturb(x, y, z);
+
                 remaining -= usedHere;
             }
 
-            pos = pos.up();
+            y += 1;
         }
     }
 
@@ -185,7 +190,9 @@ public class WorldIO {
     }
 
     private HashSet<BlockPos> smooth(BlockPos center) {
-        HashSet<BlockPos> S = gather(center);
+        HashSet<Long> packed = gatherPacked(center);
+
+        HashSet<BlockPos> S = toBlockPosSet(packed, center.getY());
 
         if (S.size() == 1) return S;
         if (maxDifference(S) <= 1) return S;
@@ -211,50 +218,71 @@ public class WorldIO {
         return S;
     }
 
-    private HashSet<BlockPos> gather(BlockPos seedPos) {
-        ArrayDeque<BlockPos> toVisit = new ArrayDeque<>();
-        HashSet<BlockPos> visited = new HashSet<>();
+    private static long packXZ(int x, int z) {
+        return (((long) x) << 32) ^ (z & 0xffffffffL);
+    }
 
-        toVisit.add(seedPos);
-        visited.add(seedPos);
+    private static int unpackX(long p) {
+        return (int) (p >> 32);
+    }
+
+    private static int unpackZ(long p) {
+        return (int) p;
+    }
+
+    private HashSet<Long> gatherPacked(BlockPos seedPos) {
+        final int cy = seedPos.getY();
+        final int cx = seedPos.getX();
+        final int cz = seedPos.getZ();
+
+        ArrayDeque<Long> toVisit = new ArrayDeque<>();
+        HashSet<Long> visited = new HashSet<>();
+
+        long seed = packXZ(cx, cz);
+        toVisit.add(seed);
+        visited.add(seed);
 
         for (int depth = 0; depth < SMOOTH_R; depth++) {
             int layerSize = toVisit.size();
 
             for (int i = 0; i < layerSize; i++) {
-                BlockPos pos = toVisit.pop();
+                long p = toVisit.pop();
+                int x = unpackX(p);
+                int z = unpackZ(p);
 
-                tryNeighbor(pos.north(), toVisit, visited, seedPos);
-                tryNeighbor(pos.east(), toVisit, visited, seedPos);
-                tryNeighbor(pos.south(), toVisit, visited, seedPos);
-                tryNeighbor(pos.west(), toVisit, visited, seedPos);
+                tryNeighborPacked(x, cy, z - 1, toVisit, visited, cx, cy, cz); // north
+                tryNeighborPacked(x + 1, cy, z, toVisit, visited, cx, cy, cz); // east
+                tryNeighborPacked(x, cy, z + 1, toVisit, visited, cx, cy, cz); // south
+                tryNeighborPacked(x - 1, cy, z, toVisit, visited, cx, cy, cz); // west
             }
         }
 
         return visited;
     }
 
-    private void tryNeighbor(
-            BlockPos neighbor,
-            ArrayDeque<BlockPos> toVisit,
-            HashSet<BlockPos> visited,
-            BlockPos center
+    private void tryNeighborPacked(
+            int nx, int ny, int nz,
+            ArrayDeque<Long> toVisit,
+            HashSet<Long> visited,
+            int cx, int cy, int cz
     ) {
-        int nx = neighbor.getX();
-        int ny = neighbor.getY();
-        int nz = neighbor.getZ();
-        int cx = center.getX();
-        int cy = center.getY();
-        int cz = center.getZ();
-
         if (Math.abs(nx - cx) + Math.abs(nz - cz) > SMOOTH_R) return;
-        if (neighbor.getY() != center.getY()) return;
+        if (ny != cy) return;
         if (ops.isSolidAt(nx, ny, nz)) return;
         if (ops.getEffectiveLevel(nx, ny, nz) <= 0) return;
 
-        if (visited.add(neighbor)) {
-            toVisit.add(neighbor);
+        long packed = packXZ(nx, nz);
+        if (visited.add(packed)) {
+            toVisit.add(packed);
         }
+    }
+
+    private static HashSet<BlockPos> toBlockPosSet(HashSet<Long> packed, int y) {
+        HashSet<BlockPos> out = new HashSet<>(Math.max(16, (int) (packed.size() / 0.75f) + 1));
+        for (long p : packed) {
+            out.add(new BlockPos(unpackX(p), y, unpackZ(p)));
+        }
+        return out;
     }
 
     private int maxDifference(HashSet<BlockPos> S) {
@@ -274,14 +302,10 @@ public class WorldIO {
     }
 
     private int computeTotalWater(HashSet<BlockPos> S) {
-        var iterator = S.iterator();
         int total = 0;
-
-        while (iterator.hasNext()) {
-            BlockPos pos = iterator.next();
+        for (BlockPos pos : S) {
             total += ops.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
         }
-
         return total;
     }
 
@@ -322,52 +346,60 @@ public class WorldIO {
         return true;
     }
 
-    // only if loaded
     private void wake(BlockPos pos) {
         touch(pos, grid::getLoadedRegion);
     }
 
-    // can create
+    private void wake(int x, int y, int z) {
+        tmp.set(x, y, z);
+        touch(tmp, grid::getLoadedRegion);
+    }
+
     public void disturb(BlockPos pos) {
         touch(pos, grid::getOrCreateRegion);
+    }
+
+    private void disturb(int x, int y, int z) {
+        tmp.set(x, y, z);
+        touch(tmp, grid::getOrCreateRegion);
     }
 
     private void wakeAround(BlockPos pos) {
         int x = pos.getX(), y = pos.getY(), z = pos.getZ();
 
-        wake(new BlockPos(x, y, z));
+        wake(x, y, z);
 
-        wake(new BlockPos(x, y + 1, z));
-        wake(new BlockPos(x, y - 1, z));
+        wake(x, y + 1, z);
+        wake(x, y - 1, z);
 
-        wake(new BlockPos(x, y, z - 1));
-        wake(new BlockPos(x, y, z + 1));
-        wake(new BlockPos(x + 1, y, z));
-        wake(new BlockPos(x - 1, y, z));
+        wake(x, y, z - 1);
+        wake(x, y, z + 1);
+        wake(x + 1, y, z);
+        wake(x - 1, y, z);
 
-        wake(new BlockPos(x + 1, y, z - 1));
-        wake(new BlockPos(x - 1, y, z - 1));
-        wake(new BlockPos(x + 1, y, z + 1));
-        wake(new BlockPos(x - 1, y, z + 1));
+        wake(x + 1, y, z - 1);
+        wake(x - 1, y, z - 1);
+        wake(x + 1, y, z + 1);
+        wake(x - 1, y, z + 1);
     }
 
     public void disturbAround(BlockPos pos) {
         int x = pos.getX(), y = pos.getY(), z = pos.getZ();
 
-        disturb(new BlockPos(x, y, z));
+        disturb(x, y, z);
 
-        disturb(new BlockPos(x, y + 1, z));
-        disturb(new BlockPos(x, y - 1, z));
+        disturb(x, y + 1, z);
+        disturb(x, y - 1, z);
 
-        disturb(new BlockPos(x, y, z - 1));
-        disturb(new BlockPos(x, y, z + 1));
-        disturb(new BlockPos(x + 1, y, z));
-        disturb(new BlockPos(x - 1, y, z));
+        disturb(x, y, z - 1);
+        disturb(x, y, z + 1);
+        disturb(x + 1, y, z);
+        disturb(x - 1, y, z);
 
-        disturb(new BlockPos(x + 1, y, z - 1));
-        disturb(new BlockPos(x - 1, y, z - 1));
-        disturb(new BlockPos(x + 1, y, z + 1));
-        disturb(new BlockPos(x - 1, y, z + 1));
+        disturb(x + 1, y, z - 1);
+        disturb(x - 1, y, z - 1);
+        disturb(x + 1, y, z + 1);
+        disturb(x - 1, y, z + 1);
     }
 
     private void touch(BlockPos pos, java.util.function.Function<RegionKey, WaterRegion> regionGetter) {
@@ -384,5 +416,4 @@ public class WorldIO {
         region.markCellActive(lx, ly, lz);
         ops.activateRegion(key);
     }
-
 }
