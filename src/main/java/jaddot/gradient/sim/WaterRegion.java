@@ -1,5 +1,7 @@
 package jaddot.gradient.sim;
 
+import jaddot.gradient.config.Parameters;
+
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Queue;
@@ -7,7 +9,7 @@ import java.util.Random;
 
 public class WaterRegion {
 
-    public static final int MAX_LEVEL = 16;
+    public static final int MAX_LEVEL = Parameters.MAX_LEVEL;
     public static final int MAX_DOWNWARD_MOVEMENT = 4;
     public static final int SEEK = 2;
 

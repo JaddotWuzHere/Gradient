@@ -1,5 +1,6 @@
 package jaddot.gradient.world;
 
+import jaddot.gradient.config.Parameters;
 import jaddot.gradient.mc.BlockWriteGuard;
 import jaddot.gradient.mc.VanillaWaterBridge;
 import jaddot.gradient.sim.WaterRegion;
@@ -278,7 +279,7 @@ public class WorldIO {
     }
 
     private static HashSet<BlockPos> toBlockPosSet(HashSet<Long> packed, int y) {
-        HashSet<BlockPos> out = new HashSet<>(Math.max(16, (int) (packed.size() / 0.75f) + 1));
+        HashSet<BlockPos> out = new HashSet<>(Math.max(Parameters.MAX_LEVEL, (int) (packed.size() / 0.75f) + 1));
         for (long p : packed) {
             out.add(new BlockPos(unpackX(p), y, unpackZ(p)));
         }

@@ -1,5 +1,6 @@
 package jaddot.gradient.mc;
 
+import jaddot.gradient.config.Parameters;
 import net.minecraft.entity.Entity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -33,7 +34,7 @@ public final class FluidHeight {
                     int level = getSimLevel(world, pos);
                     if (level <= 0) continue;
 
-                    double surfaceY = y + (level / 16.0);
+                    double surfaceY = y + Parameters.levelToHeightD(level);
                     double overlap = surfaceY - box.minY;
                     if (overlap <= 0.0) continue;
 
@@ -71,7 +72,7 @@ public final class FluidHeight {
                 int level = getSimLevel(world, pos);
                 if (level <= 0) continue;
 
-                double surfaceY = y + (level / 16.0);
+                double surfaceY = y + Parameters.levelToHeightD(level);
                 if (eyeY < surfaceY) return true;
             }
         }
@@ -100,7 +101,7 @@ public final class FluidHeight {
                     int level = getSimLevel(world, pos);
                     if (level <= 0) continue;
 
-                    double surfaceY = y + (level / 16.0);
+                    double surfaceY = y + Parameters.levelToHeightD(level);
                     if (box.maxY < surfaceY) return true;
                 }
             }
@@ -111,16 +112,14 @@ public final class FluidHeight {
     private static int getSimLevel(World world, BlockPos pos) {
         if (world.isClient) {
             int lvl = WaterLevelAccess.getClientLevel16(world, pos.getX(), pos.getY(), pos.getZ());
-            if (lvl < 0) lvl = 0;
-            if (lvl > 16) lvl = 16;
+            lvl = Parameters.clampLevel(lvl);
             return lvl;
         }
 
         if (world instanceof ServerWorld serverWorld) {
             var mgr = WaterHooks.getManager(serverWorld);
             int lvl = mgr.getEffectiveLevel(pos.getX(), pos.getY(), pos.getZ());
-            if (lvl < 0) lvl = 0;
-            if (lvl > 16) lvl = 16;
+            lvl = Parameters.clampLevel(lvl);
             return lvl;
         }
 
