@@ -1,9 +1,10 @@
 package jaddot.gradient.mc;
 
+import jaddot.gradient.config.Parameters;
 import net.minecraft.item.ItemStack;
 
 public final class BucketData {
-    public static final int MAX_CAPACITY = 16;
+    public static final int MAX_CAPACITY = Parameters.MAX_LEVEL;
     private BucketData() {}
 
     public static final String KEY = "gradient_water_units";

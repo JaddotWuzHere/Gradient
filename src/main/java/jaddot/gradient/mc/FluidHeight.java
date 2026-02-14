@@ -109,7 +109,7 @@ public final class FluidHeight {
         return false;
     }
 
-    private static int getSimLevel(World world, BlockPos pos) {
+    public static int getSimLevel(World world, BlockPos pos) {
         if (world.isClient) {
             int lvl = WaterLevelAccess.getClientLevel16(world, pos.getX(), pos.getY(), pos.getZ());
             lvl = Parameters.clampLevel(lvl);

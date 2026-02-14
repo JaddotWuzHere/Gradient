@@ -1,7 +1,8 @@
-- clean code
+- implement custom in water movement
+- implement fall damage reduction
+- implement buoyancy
 - fix bucket pickup ray trace thingy
 - replace naturally generated water
 - override any kind of vanilla water placement (bucket of fish, dispensers, etc)
-- override vanilla water block properties?
+- override vanilla water block properties (blockstates)?
 - implement water flow
-- implement movement slowdown depending on level of water

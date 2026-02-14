@@ -1,5 +1,6 @@
 package jaddot.gradient.mixins.client;
 
+import jaddot.gradient.config.Parameters;
 import jaddot.gradient.ClientWaterLevelCache;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -55,17 +56,14 @@ public class FluidRendererMixin {
         }
 
         if (level > 0) {
-            float h = level / 16.0f;
-            if (h < 0f) h = 0f;
-            if (h > 1f) h = 1f;
-            return h;
+            return Parameters.levelToHeightF(level);
         }
 
         FluidState fs = fluidStateMaybe;
         if (fs == null) fs = view.getFluidState(pos);
 
         if (!fs.isEmpty() && (fs.getFluid() == Fluids.WATER || fs.getFluid() == Fluids.FLOWING_WATER)) {
-            return 1.0f / 16.0f;
+            return Parameters.invMaxLevel();
         }
 
         return null;

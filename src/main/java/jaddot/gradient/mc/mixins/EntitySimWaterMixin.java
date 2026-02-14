@@ -29,17 +29,6 @@ public abstract class EntitySimWaterMixin {
     }
 
     @Inject(
-            method = "updateMovementInFluid(Lnet/minecraft/registry/tag/TagKey;D)Z",
-            at = @At("HEAD"),
-            cancellable = true
-    )
-    private void gradient$overrideUpdateMovementInFluid(TagKey<Fluid> tag, double speed, CallbackInfoReturnable<Boolean> cir) {
-        if (tag != FluidTags.WATER) return;
-        gradient$refreshCacheIfNeeded(tag);
-        cir.setReturnValue(gradient$cachedHeight > 0.0);
-    }
-
-    @Inject(
             method = "getFluidHeight(Lnet/minecraft/registry/tag/TagKey;)D",
             at = @At("HEAD"),
             cancellable = true
