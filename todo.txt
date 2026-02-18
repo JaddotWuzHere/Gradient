@@ -1,6 +1,5 @@
-- implement custom in water movement
+- make water seek lower elevation when nearby blocks are broken
 - implement fall damage reduction
-- implement buoyancy
 - fix bucket pickup ray trace thingy
 - replace naturally generated water
 - override any kind of vanilla water placement (bucket of fish, dispensers, etc)

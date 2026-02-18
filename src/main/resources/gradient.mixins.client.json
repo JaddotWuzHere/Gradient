@@ -3,7 +3,8 @@
   "package": "jaddot.gradient.mixins.client",
   "compatibilityLevel": "JAVA_17",
   "client": [
-    "FluidRendererMixin"
+    "FluidRendererMixin",
+    "CameraSubmersionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

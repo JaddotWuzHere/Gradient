@@ -25,7 +25,7 @@ public abstract class EntitySimWaterMixin {
 
         gradient$cachedTick = tick;
         gradient$cachedHeight = FluidHeight.computeEntityFluidHeight(self);
-        gradient$cachedSubmerged = FluidHeight.isSubmergedBySim(self);
+        gradient$cachedSubmerged = FluidHeight.areEyesInSimWater(self);
     }
 
     @Inject(
