@@ -403,14 +403,14 @@ public class WorldIO {
         disturb(x - 1, y, z + 1);
     }
 
-    public void wakeSeekDiamond(int cx, int cy, int cz, int R) {
+    public void wakeSeek(int cx, int cy, int cz, int R) {
         for (int dx = -R; dx <= R; dx++) {
             for (int dz = -R; dz <= R; dz++) {
-                if (Math.abs(dx) + Math.abs(dz) > R) continue;
                 wake(cx + dx, cy, cz + dz);
             }
         }
     }
+
 
     private void touch(BlockPos pos, java.util.function.Function<RegionKey, WaterRegion> regionGetter) {
         int wx = pos.getX(), wy = pos.getY(), wz = pos.getZ();

@@ -117,8 +117,8 @@ public class WaterRegionManager {
         return grid.anyRegionLoadedInBox(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
-    public void wakeSeekDiamond(int x, int y, int z, int r) {
-        worldIO.wakeSeekDiamond(x, y, z, r);
+    public void wakeSeek(int x, int y, int z, int r) {
+        worldIO.wakeSeek(x, y, z, r);
     }
 
 }

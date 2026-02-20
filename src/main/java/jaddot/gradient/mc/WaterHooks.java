@@ -141,17 +141,8 @@ public class WaterHooks {
         if (becameUnblocked(oldState, newState)) {
             int R = WaterRegion.SEEK;
 
-            int minX = worldX - R;
-            int maxX = worldX + R;
-            int minY = worldY - R;
-            int maxY = worldY + R;
-            int minZ = worldZ - R;
-            int maxZ = worldZ + R;
-
-            if (manager.anyRegionLoadedInBox(minX, minY, minZ, maxX, maxY, maxZ)) {
-                manager.wakeSeekDiamond(worldX, worldY, worldZ, R);
-                manager.wakeSeekDiamond(worldX, worldY + 1, worldZ, R);
-            }
+            manager.wakeSeek(worldX, worldY, worldZ, R);
+            manager.wakeSeek(worldX, worldY + 1, worldZ, R);
         }
     }
 
