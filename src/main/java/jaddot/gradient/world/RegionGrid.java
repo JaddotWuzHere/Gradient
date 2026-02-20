@@ -72,6 +72,25 @@ public class RegionGrid {
         return region;
     }
 
+    public boolean anyRegionLoadedInBox(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        int minRx = Math.floorDiv(minX, REGION_SIZE);
+        int maxRx = Math.floorDiv(maxX, REGION_SIZE);
+        int minRy = Math.floorDiv(minY, REGION_SIZE);
+        int maxRy = Math.floorDiv(maxY, REGION_SIZE);
+        int minRz = Math.floorDiv(minZ, REGION_SIZE);
+        int maxRz = Math.floorDiv(maxZ, REGION_SIZE);
+
+        for (int rx = minRx; rx <= maxRx; rx++) {
+            for (int ry = minRy; ry <= maxRy; ry++) {
+                for (int rz = minRz; rz <= maxRz; rz++) {
+                    if (isRegionLoaded(internKey(rx, ry, rz))) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
     public void bootstrapAllFromSnapshots() {
         for (RegionKey key: save.getSnapshotKeys()) {
             getOrCreateRegion(key);

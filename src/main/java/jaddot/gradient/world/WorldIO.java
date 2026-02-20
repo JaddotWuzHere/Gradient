@@ -347,11 +347,11 @@ public class WorldIO {
         return true;
     }
 
-    private void wake(BlockPos pos) {
+    public void wake(BlockPos pos) {
         touch(pos, grid::getLoadedRegion);
     }
 
-    private void wake(int x, int y, int z) {
+    public void wake(int x, int y, int z) {
         tmp.set(x, y, z);
         touch(tmp, grid::getLoadedRegion);
     }
@@ -360,7 +360,7 @@ public class WorldIO {
         touch(pos, grid::getOrCreateRegion);
     }
 
-    private void disturb(int x, int y, int z) {
+    public void disturb(int x, int y, int z) {
         tmp.set(x, y, z);
         touch(tmp, grid::getOrCreateRegion);
     }
@@ -401,6 +401,15 @@ public class WorldIO {
         disturb(x - 1, y, z - 1);
         disturb(x + 1, y, z + 1);
         disturb(x - 1, y, z + 1);
+    }
+
+    public void wakeSeekDiamond(int cx, int cy, int cz, int R) {
+        for (int dx = -R; dx <= R; dx++) {
+            for (int dz = -R; dz <= R; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) > R) continue;
+                wake(cx + dx, cy, cz + dz);
+            }
+        }
     }
 
     private void touch(BlockPos pos, java.util.function.Function<RegionKey, WaterRegion> regionGetter) {

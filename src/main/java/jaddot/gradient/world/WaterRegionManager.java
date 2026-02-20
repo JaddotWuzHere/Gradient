@@ -112,4 +112,13 @@ public class WaterRegionManager {
         RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         ops.getOrCreateActiveRegion(key);
     }
+
+    public boolean anyRegionLoadedInBox(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        return grid.anyRegionLoadedInBox(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    public void wakeSeekDiamond(int x, int y, int z, int r) {
+        worldIO.wakeSeekDiamond(x, y, z, r);
+    }
+
 }
