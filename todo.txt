@@ -1,7 +1,7 @@
-- make water seek lower elevation when nearby blocks are broken
-- implement fall damage reduction
 - fix bucket pickup ray trace thingy
 - replace naturally generated water
 - override any kind of vanilla water placement (bucket of fish, dispensers, etc)
-- override vanilla water block properties (blockstates)?
+- implement blocks water will destroy when flowed into
+- implement blocks that water can waterlog/flow into
 - implement water flow
+- override vanilla water block properties (blockstates)?

@@ -43,9 +43,11 @@ public class BucketItemMixin {
         boolean isWater = stack.isOf(Items.WATER_BUCKET);
         if (!isEmpty && !isWater) return;
 
-        BlockHitResult hit = ItemRaycastAccessor.gradient$invokeRaycast(
-                world, player, RaycastContext.FluidHandling.NONE
-        );
+        RaycastContext.FluidHandling fluidHandling = isEmpty
+                ? RaycastContext.FluidHandling.SOURCE_ONLY
+                : RaycastContext.FluidHandling.NONE;
+        BlockHitResult hit = ItemRaycastAccessor.gradient$invokeRaycast(world, player, fluidHandling);
+
         if (hit.getType() != HitResult.Type.BLOCK) return;
 
         BlockPos clicked = hit.getBlockPos();
