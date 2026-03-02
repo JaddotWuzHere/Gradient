@@ -3,6 +3,7 @@ package jaddot.gradient;
 import jaddot.gradient.mc.WaterHooks;
 import net.fabricmc.api.ModInitializer;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 
 import org.slf4j.Logger;
@@ -16,7 +17,6 @@ public class Gradient implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Gradient initializing");
 		ServerTickEvents.END_WORLD_TICK.register(WaterHooks::onWorldTick);
-
 	}
 
 }

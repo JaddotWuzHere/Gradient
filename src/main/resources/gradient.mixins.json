@@ -11,7 +11,7 @@
 		"BucketItemMixin",
 		"ItemBarMixin",
 		"BucketTooltipMixin",
-		"ItemRaycastAccessor",
+		"ItemRaycastAccessorMixin",
 		"EntitySimWaterMixin",
 		"LivingEntityWaterSlowdownMixin"
 	],

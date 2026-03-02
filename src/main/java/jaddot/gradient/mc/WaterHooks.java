@@ -1,5 +1,6 @@
 package jaddot.gradient.mc;
 
+import jaddot.gradient.Gradient;
 import jaddot.gradient.sim.WaterQuery;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
@@ -16,12 +17,16 @@ import java.util.*;
 
 public class WaterHooks {
 
+    private static final int ASSIMILATE_MAX_NODES = 2048;
+    private static final int ASSIMILATE_RADIUS = 16;
+
     /* -------------------------------------------- */
     /*                block checking                */
     /* -------------------------------------------- */
 
     public static void onWaterPlaced(ServerWorld world, BlockPos pos, int amount) {
         WaterRegionManager manager = getManager(world);
+        manager.assimilateRegionFromWorld(world, pos.getX(), pos.getY(), pos.getZ());
 
         if (amount == 1) {
             manager.onPlayerAddOneLevel(world, pos);
@@ -119,6 +124,10 @@ public class WaterHooks {
 
 
     public static void onBlockStateChanged(ServerWorld world, BlockPos pos, BlockState oldState, BlockState newState) {
+        if (shouldAssimilateOnChange(world, pos, oldState, newState)) {
+            getManager(world).assimilateRegionFromWorld(world, pos.getX(), pos.getY(), pos.getZ());
+        }
+
         WaterRegionManager manager = getManager(world);
         int worldX = pos.getX();
         int worldY = pos.getY();
@@ -199,6 +208,33 @@ public class WaterHooks {
     }
 
     /* -------------------------------------------- */
+    /*                 assimilation                 */
+    /* -------------------------------------------- */
+
+    private static boolean shouldAssimilateOnChange(ServerWorld world, BlockPos pos, BlockState oldState, BlockState newState) {
+        if (oldState == newState) return false;
+
+        boolean topologyChanged =
+                blocksWater(oldState) != blocksWater(newState) ||
+                        !oldState.getFluidState().equals(newState.getFluidState()) ||
+                        oldState.isOf(Blocks.WATER) != newState.isOf(Blocks.WATER);
+
+        if (!topologyChanged) return false;
+
+        return hasWaterFluid(world, pos) ||
+                hasWaterFluid(world, pos.north()) ||
+                hasWaterFluid(world, pos.south()) ||
+                hasWaterFluid(world, pos.east())  ||
+                hasWaterFluid(world, pos.west())  ||
+                hasWaterFluid(world, pos.up())    ||
+                hasWaterFluid(world, pos.down());
+    }
+
+    private static boolean hasWaterFluid(ServerWorld world, BlockPos pos) {
+        return world.getFluidState(pos).isOf(net.minecraft.fluid.Fluids.WATER);
+    }
+
+    /* -------------------------------------------- */
     /*                 manager stuff                */
     /* -------------------------------------------- */
 
@@ -206,11 +242,11 @@ public class WaterHooks {
         if (!world.getRegistryKey().equals(World.OVERWORLD)) {
             return;
         }
+
         getManager(world).tick(world);
     }
 
     public static WaterRegionManager getManager(ServerWorld world) {
         return WaterSimState.get(world).getManager();
     }
-
 }

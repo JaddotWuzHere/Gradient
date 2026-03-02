@@ -23,8 +23,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.*;
-
 @Mixin(BucketItem.class)
 public class BucketItemMixin {
     private static final int MAX = 16;
@@ -46,7 +44,7 @@ public class BucketItemMixin {
         RaycastContext.FluidHandling fluidHandling = isEmpty
                 ? RaycastContext.FluidHandling.SOURCE_ONLY
                 : RaycastContext.FluidHandling.NONE;
-        BlockHitResult hit = ItemRaycastAccessor.gradient$invokeRaycast(world, player, fluidHandling);
+        BlockHitResult hit = ItemRaycastAccessorMixin.gradient$invokeRaycast(world, player, fluidHandling);
 
         if (hit.getType() != HitResult.Type.BLOCK) return;
 

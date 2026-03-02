@@ -5,6 +5,7 @@ import jaddot.gradient.mc.BlockWriteGuard;
 import jaddot.gradient.mc.VanillaWaterBridge;
 import jaddot.gradient.sim.WaterRegion;
 import net.minecraft.block.Blocks;
+import net.minecraft.fluid.Fluids;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
@@ -45,10 +46,12 @@ public class WorldIO {
 
                     var state = world.getBlockState(pos);
 
+                    boolean hasWaterFluid = state.getFluidState().isOf(Fluids.WATER);
+
                     boolean isSolid =
                             !state.isAir() &&
-                                    !state.isOf(Blocks.WATER) &&
-                                    !state.isOf(Blocks.BUBBLE_COLUMN);
+                            !hasWaterFluid &&
+                            !state.isOf(Blocks.BUBBLE_COLUMN);
 
                     region.setSolid(x, y, z, isSolid);
 
@@ -90,6 +93,10 @@ public class WorldIO {
                             continue;
                         }
 
+                        if (!region.isOwned(x, y, z)) {
+                            continue;
+                        }
+
                         VanillaWaterBridge.applyCell(world, pos, wl);
                     }
                 }
@@ -127,10 +134,12 @@ public class WorldIO {
             cursor.set(x, y, z);
             var state = world.getBlockState(cursor);
 
+            boolean hasWaterFluid = state.getFluidState().isOf(Fluids.WATER);
+
             boolean isSolid =
                     !state.isAir() &&
-                            !state.isOf(Blocks.WATER) &&
-                            !state.isOf(Blocks.BUBBLE_COLUMN);
+                    !hasWaterFluid &&
+                    !state.isOf(Blocks.BUBBLE_COLUMN);
 
             if (isSolid) return false;
 
@@ -171,6 +180,7 @@ public class WorldIO {
                 int usedHere = Math.min(remaining, capacity);
 
                 region.setLevel(localX, localY, localZ, base + usedHere);
+                region.setOwned(localX, localY, localZ, true);
 
                 disturb(x, y, z);
 
@@ -426,4 +436,6 @@ public class WorldIO {
         region.markCellActive(lx, ly, lz);
         ops.activateRegion(key);
     }
+
+
 }

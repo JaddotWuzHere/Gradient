@@ -49,6 +49,10 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
             if (safeAmount < maxRemoval) safeAmount = maxRemoval;
         }
 
+        if (safeAmount > 0) {
+            region.setOwned(localX, localY, localZ, true);
+        }
+
         region.addDelta(localX, localY, localZ, safeAmount);
         activateRegion(key);
     }
@@ -58,34 +62,57 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
         RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
 
-        if (region == null) return 0;
+        if (region == null) {
+            return vanillaFallbackLevel(worldX, worldY, worldZ);
+        }
 
-        int localX = RegionMath.lx(worldX);
-        int localY = RegionMath.ly(worldY);
-        int localZ = RegionMath.lz(worldZ);
+        int lx = RegionMath.lx(worldX);
+        int ly = RegionMath.ly(worldY);
+        int lz = RegionMath.lz(worldZ);
 
-        return region.getLevel(localX, localY, localZ) +
-                region.getDelta(localX, localY, localZ);
+        if (!region.isOwned(lx, ly, lz)) {
+            int v = vanillaFallbackLevel(worldX, worldY, worldZ);
+            if (v > 0) return v;
+        }
+
+        return region.getLevel(lx, ly, lz) + region.getDelta(lx, ly, lz);
     }
 
     @Override
     public int getBaseLevel(int worldX, int worldY, int worldZ) {
         RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
-        if (region == null) return 0;
+
+        if (region == null) {
+            return vanillaFallbackLevel(worldX, worldY, worldZ);
+        }
 
         int lx = RegionMath.lx(worldX);
         int ly = RegionMath.ly(worldY);
         int lz = RegionMath.lz(worldZ);
+
+        if (!region.isOwned(lx, ly, lz)) {
+            int v = vanillaFallbackLevel(worldX, worldY, worldZ);
+            if (v > 0) return v;
+        }
 
         return region.getLevel(lx, ly, lz);
     }
 
     @Override
     public boolean isSolidAt(int worldX, int worldY, int worldZ) {
+        if (this.world == null) return false;
+
         RegionKey key = grid.getRegionKey(worldX, worldY, worldZ);
         WaterRegion region = grid.getLoadedRegion(key);
-        if (region == null) return false;
+
+        if (region == null) {
+            var pos = new BlockPos(worldX, worldY, worldZ);
+            var state = world.getBlockState(pos);
+            return !state.isAir()
+                    && !state.isOf(net.minecraft.block.Blocks.WATER)
+                    && !state.isOf(net.minecraft.block.Blocks.BUBBLE_COLUMN);
+        }
 
         int lx = RegionMath.lx(worldX);
         int ly = RegionMath.ly(worldY);
@@ -168,6 +195,16 @@ public class RegionOperations implements WaterDeltaSink, WaterQuery, WaterActiva
         }
 
         return region;
+    }
+
+    private int vanillaFallbackLevel(int worldX, int worldY, int worldZ) {
+        if (this.world == null) return 0;
+
+        var pos = new BlockPos(worldX, worldY, worldZ);
+        if (!world.getBlockState(pos).isOf(net.minecraft.block.Blocks.WATER)) return 0;
+
+        var above = new BlockPos(worldX, worldY + 1, worldZ);
+        return world.getBlockState(above).isOf(net.minecraft.block.Blocks.WATER) ? 16 : 15;
     }
 
     public void displace(BlockPos pos, List<BlockPos> validNeighbors, BlockPos up) {

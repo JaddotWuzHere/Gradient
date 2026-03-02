@@ -3,6 +3,9 @@ package jaddot.gradient.world;
 import jaddot.gradient.net.GradientServerNetworking;
 import jaddot.gradient.sim.WaterRegion;
 import jaddot.gradient.sim.WaterSimState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.fluid.Fluids;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
@@ -61,6 +64,79 @@ public class WaterRegionManager {
             byte[] flatLevels = region.toFlatLevels();
             WaterSimState.RegionSnapshot snapshot = new WaterSimState.RegionSnapshot(flatLevels);
             save.putSnapshot(key, snapshot);
+        }
+    }
+
+    public void assimilateVanillaWaterAt(ServerWorld world, int wx, int wy, int wz, int simLevel) {
+        RegionKey key = grid.getRegionKey(wx, wy, wz);
+
+        BlockState state = world.getBlockState(new BlockPos(wx, wy, wz));
+        if (!state.isOf(Blocks.WATER)) return;
+
+        WaterRegion region = grid.getOrCreateRegion(key);
+
+        int lx = RegionMath.lx(wx);
+        int ly = RegionMath.ly(wy);
+        int lz = RegionMath.lz(wz);
+
+        if (region.isSolid(lx, ly, lz)) return;
+
+        region.setLevel(lx, ly, lz, simLevel);
+        region.setOwned(lx, ly, lz, true);
+
+        if (region.getDelta(lx, ly, lz) != 0) region.clearDelta(lx, ly, lz);
+
+        ops.getOrCreateActiveRegion(key);
+    }
+
+    public void assimilateRegionFromWorld(ServerWorld world, int wx, int wy, int wz) {
+        RegionKey key = grid.getRegionKey(wx, wy, wz);
+        assimilateRegionFromWorld(world, key);
+    }
+
+    public void assimilateRegionFromWorld(ServerWorld world, RegionKey key) {
+        WaterRegion region = grid.getOrCreateRegion(key);
+
+        BlockPos origin = grid.getRegionOrigin(key);
+        int size = grid.getRegionSize();
+
+        int ox = origin.getX();
+        int oy = origin.getY();
+        int oz = origin.getZ();
+
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+
+        boolean any = false;
+
+        for (int x = 0; x < size; x++) {
+            int xw = ox + x;
+            for (int y = 0; y < size; y++) {
+                int yw = oy + y;
+                for (int z = 0; z < size; z++) {
+                    int zw = oz + z;
+
+                    if (region.isOwned(x, y, z)) continue;
+
+                    pos.set(xw, yw, zw);
+
+                    if (!world.getFluidState(pos).isOf(Fluids.WATER)) continue;
+
+                    if (region.isSolid(x, y, z)) continue;
+
+                    boolean aboveWater = world.getFluidState(pos.up()).isOf(Fluids.WATER);
+                    int simLevel = aboveWater ? WaterRegion.MAX_LEVEL : (WaterRegion.MAX_LEVEL - 1);
+
+                    region.setLevel(x, y, z, simLevel);
+                    region.setOwned(x, y, z, true);
+                    if (region.getDelta(x, y, z) != 0) region.clearDelta(x, y, z);
+
+                    any = true;
+                }
+            }
+        }
+
+        if (any) {
+            ops.getOrCreateActiveRegion(key);
         }
     }
 

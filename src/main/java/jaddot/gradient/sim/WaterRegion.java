@@ -26,6 +26,8 @@ public class WaterRegion {
 
     private final boolean[][][] activeCells;
 
+    private final boolean[][][] owned;
+
     private Queue<Cell> currentActive;
 
     private final HashSet<Cell> touched = new HashSet<>();
@@ -70,6 +72,8 @@ public class WaterRegion {
 
         activeCells = new boolean[size][size][size];
 
+        owned = new boolean[size][size][size];
+
         currentActive = new ArrayDeque<>();
     }
 
@@ -84,6 +88,7 @@ public class WaterRegion {
     public void setLevel(int x, int y, int z, int value) {
         // requires 0 <= value <= MAX_LEVEL
         levels[x][y][z] = value;
+        if (value > 0) owned[x][y][z] = true;
     }
 
     public boolean isSolid(int x, int y, int z) {
@@ -108,6 +113,14 @@ public class WaterRegion {
 
     public void clearDelta(int x, int y, int z) {
         deltas[x][y][z] = 0;
+    }
+
+    public boolean isOwned(int x, int y, int z) {
+        return owned[x][y][z];
+    }
+
+    public void setOwned(int x, int y, int z, boolean value) {
+        owned[x][y][z] = value;
     }
 
     /* -------------------------------------------- */
@@ -164,6 +177,7 @@ public class WaterRegion {
                     int level = flattened[i] & 0xFF;
                     if (level > MAX_LEVEL) level = MAX_LEVEL;
                     levels[x][y][z] = level;
+                    owned[x][y][z] = (level > 0);
                     i++;
                 }
             }
@@ -232,6 +246,7 @@ public class WaterRegion {
                         levels[x][y][z] += d;
                         deltas[x][y][z] = 0;
                         falling[x][y][z] = false;
+                        if (levels[x][y][z] > 0) owned[x][y][z] = true;
                         any = true;
 
                         if (!activeCells[x][y][z]) {
