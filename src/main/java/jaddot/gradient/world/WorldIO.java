@@ -68,6 +68,11 @@ public class WorldIO {
     public void applyRegionToWorld(ServerWorld world, RegionKey key, WaterRegion region) {
         IntArrayList dirty = region.drainDirtyIndices();
         if (dirty.isEmpty()) return;
+        applyRegionToWorld(world, key, region, dirty);
+    }
+
+    public void applyRegionToWorld(ServerWorld world, RegionKey key, WaterRegion region, IntArrayList dirty) {
+        if (dirty.isEmpty()) return;
 
         int size = grid.getRegionSize();
         BlockPos origin = grid.getRegionOrigin(key);

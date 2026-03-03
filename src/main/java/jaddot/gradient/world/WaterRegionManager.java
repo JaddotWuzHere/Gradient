@@ -59,7 +59,7 @@ public class WaterRegionManager {
 
             boolean hadDirty = region.hasDirtyCells();
 
-            if (hadDirty && (world.getTime() % 3L) == 0L) {
+            if (hadDirty && (world.getTime() % 2L) == 0L) {
                 GradientServerNetworking.sendRegionSnapshot(world, grid, key, region);
                 worldIO.applyRegionToWorld(world, key, region);
             }
@@ -67,7 +67,7 @@ public class WaterRegionManager {
             if (stillActive) activeRegions.add(key);
 
             // save snapshot
-            if (hadDirty || (world.getTime() % 20L) == 0L) {
+            if (hadDirty || (world.getTime() % 200L) == 0L) {
                 byte[] flatLevels = region.toFlatLevels();
                 WaterSimState.RegionSnapshot snapshot = new WaterSimState.RegionSnapshot(flatLevels);
                 save.putSnapshot(key, snapshot);

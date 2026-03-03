@@ -216,13 +216,13 @@ public class WaterHooks {
     private static boolean shouldAssimilateOnChange(ServerWorld world, BlockPos pos, BlockState oldState, BlockState newState) {
         if (oldState == newState) return false;
 
-        boolean topologyChanged =
-                blocksWater(oldState) != blocksWater(newState) ||
-                        !oldState.getFluidState().equals(newState.getFluidState()) ||
-                        oldState.isOf(Blocks.WATER) != newState.isOf(Blocks.WATER);
-
+        // Only assimilate when the *solid topology* changes:
+        // (air/replaceable/water) <-> (solid)
+        // This prevents vanilla water level/state churn from constantly re-triggering assimilation in oceans.
+        boolean topologyChanged = blocksWater(oldState) != blocksWater(newState);
         if (!topologyChanged) return false;
 
+        // Only bother if there is water in/nearby (so we don't scan regions for random solid edits in dry areas)
         return hasWaterFluid(world, pos) ||
                 hasWaterFluid(world, pos.north()) ||
                 hasWaterFluid(world, pos.south()) ||
