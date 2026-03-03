@@ -129,6 +129,8 @@ public class WaterHooks {
         }
 
         WaterRegionManager manager = getManager(world);
+        manager.updateSolidAt(world, pos, newState);
+
         int worldX = pos.getX();
         int worldY = pos.getY();
         int worldZ = pos.getZ();

@@ -54,39 +54,45 @@ public class WaterRegionManager {
             WaterRegion region = grid.getLoadedRegion(key);
             if (region == null) continue;
 
-            worldIO.syncSolids(world, key, region);
+            worldIO.ensureSolidsInitialized(world, key, region);
             boolean stillActive = region.step(ops, ops, ops);
-            GradientServerNetworking.sendRegionSnapshot(world, grid, key, region);
-            worldIO.applyRegionToWorld(world, key, region);
+
+            boolean hadDirty = region.hasDirtyCells();
+
+            if (hadDirty && (world.getTime() % 3L) == 0L) {
+                GradientServerNetworking.sendRegionSnapshot(world, grid, key, region);
+                worldIO.applyRegionToWorld(world, key, region);
+            }
+
             if (stillActive) activeRegions.add(key);
 
             // save snapshot
-            byte[] flatLevels = region.toFlatLevels();
-            WaterSimState.RegionSnapshot snapshot = new WaterSimState.RegionSnapshot(flatLevels);
-            save.putSnapshot(key, snapshot);
+            if (hadDirty || (world.getTime() % 20L) == 0L) {
+                byte[] flatLevels = region.toFlatLevels();
+                WaterSimState.RegionSnapshot snapshot = new WaterSimState.RegionSnapshot(flatLevels);
+                save.putSnapshot(key, snapshot);
+            }
         }
     }
 
-    public void assimilateVanillaWaterAt(ServerWorld world, int wx, int wy, int wz, int simLevel) {
-        RegionKey key = grid.getRegionKey(wx, wy, wz);
+    public void updateSolidAt(ServerWorld world, BlockPos pos, BlockState newState) {
+        RegionKey key = grid.getRegionKey(pos.getX(), pos.getY(), pos.getZ());
+        WaterRegion region = grid.getLoadedRegion(key);
+        if (region == null) return;
 
-        BlockState state = world.getBlockState(new BlockPos(wx, wy, wz));
-        if (!state.isOf(Blocks.WATER)) return;
+        worldIO.ensureSolidsInitialized(world, key, region);
 
-        WaterRegion region = grid.getOrCreateRegion(key);
+        BlockPos origin = grid.getRegionOrigin(key);
+        int lx = pos.getX() - origin.getX();
+        int ly = pos.getY() - origin.getY();
+        int lz = pos.getZ() - origin.getZ();
 
-        int lx = RegionMath.lx(wx);
-        int ly = RegionMath.ly(wy);
-        int lz = RegionMath.lz(wz);
+        if (lx < 0 || ly < 0 || lz < 0) return;
+        int size = grid.getRegionSize();
+        if (lx >= size || ly >= size || lz >= size) return;
 
-        if (region.isSolid(lx, ly, lz)) return;
-
-        region.setLevel(lx, ly, lz, simLevel);
-        region.setOwned(lx, ly, lz, true);
-
-        if (region.getDelta(lx, ly, lz) != 0) region.clearDelta(lx, ly, lz);
-
-        ops.getOrCreateActiveRegion(key);
+        boolean solid = !(newState.isAir() || newState.isOf(Blocks.WATER) || newState.isReplaceable());
+        region.setSolid(lx, ly, lz, solid);
     }
 
     public void assimilateRegionFromWorld(ServerWorld world, int wx, int wy, int wz) {

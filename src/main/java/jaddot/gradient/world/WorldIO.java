@@ -1,5 +1,6 @@
 package jaddot.gradient.world;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import jaddot.gradient.config.Parameters;
 import jaddot.gradient.mc.BlockWriteGuard;
 import jaddot.gradient.mc.VanillaWaterBridge;
@@ -65,6 +66,9 @@ public class WorldIO {
     }
 
     public void applyRegionToWorld(ServerWorld world, RegionKey key, WaterRegion region) {
+        IntArrayList dirty = region.drainDirtyIndices();
+        if (dirty.isEmpty()) return;
+
         int size = grid.getRegionSize();
         BlockPos origin = grid.getRegionOrigin(key);
 
@@ -75,31 +79,34 @@ public class WorldIO {
         BlockPos.Mutable pos = new BlockPos.Mutable();
 
         BlockWriteGuard.runGuarded(() -> {
-            for (int x = 0; x < size; x++) {
+            for (int di = 0; di < dirty.size(); di++) {
+                int idx = dirty.getInt(di);
+
+                int x = idx / (size * size);
+                int rem = idx - x * (size * size);
+                int y = rem / size;
+                int z = rem - y * size;
+
                 int wx = ox + x;
-                for (int y = 0; y < size; y++) {
-                    int wy = oy + y;
-                    for (int z = 0; z < size; z++) {
-                        int wz = oz + z;
-                        pos.set(wx, wy, wz);
+                int wy = oy + y;
+                int wz = oz + z;
+                pos.set(wx, wy, wz);
 
-                        int wl = region.getLevel(x, y, z);
-                        boolean solidHere = region.isSolid(x, y, z);
+                int wl = region.getLevel(x, y, z);
+                boolean solidHere = region.isSolid(x, y, z);
 
-                        if (solidHere) {
-                            if (world.getBlockState(pos).isOf(Blocks.WATER)) {
-                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
-                            }
-                            continue;
-                        }
-
-                        if (!region.isOwned(x, y, z)) {
-                            continue;
-                        }
-
-                        VanillaWaterBridge.applyCell(world, pos, wl);
+                if (solidHere) {
+                    if (world.getBlockState(pos).isOf(Blocks.WATER)) {
+                        world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
                     }
+                    continue;
                 }
+
+                if (!region.isOwned(x, y, z)) {
+                    continue;
+                }
+
+                VanillaWaterBridge.applyCell(world, pos, wl);
             }
         });
     }
@@ -437,5 +444,10 @@ public class WorldIO {
         ops.activateRegion(key);
     }
 
+    public void ensureSolidsInitialized(ServerWorld world, RegionKey key, WaterRegion region) {
+        if (region.areSolidsInitialized()) return;
+        syncSolids(world, key, region);
+        region.setSolidsInitialized(true);
+    }
 
 }

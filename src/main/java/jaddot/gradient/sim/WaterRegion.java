@@ -1,5 +1,6 @@
 package jaddot.gradient.sim;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import jaddot.gradient.config.Parameters;
 
 import java.util.ArrayDeque;
@@ -31,6 +32,10 @@ public class WaterRegion {
     private Queue<Cell> currentActive;
 
     private final HashSet<Cell> touched = new HashSet<>();
+
+    private final boolean[] dirtyMask;
+    private final IntArrayList dirtyIndices;
+    private boolean solidsInitialized;
 
     private static final Random rand = new Random(67L);
 
@@ -75,6 +80,10 @@ public class WaterRegion {
         owned = new boolean[size][size][size];
 
         currentActive = new ArrayDeque<>();
+
+        this.dirtyMask = new boolean[size * size * size];
+        this.dirtyIndices = new IntArrayList();
+        this.solidsInitialized = false;
     }
 
     /* -------------------------------------------- */
@@ -87,7 +96,9 @@ public class WaterRegion {
 
     public void setLevel(int x, int y, int z, int value) {
         // requires 0 <= value <= MAX_LEVEL
+        int old = levels[x][y][z];
         levels[x][y][z] = value;
+        if (old != value) markDirty(x, y, z);
         if (value > 0) owned[x][y][z] = true;
     }
 
@@ -96,7 +107,9 @@ public class WaterRegion {
     }
 
     public void setSolid(int x, int y, int z, boolean value) {
+        boolean old = solids[x][y][z];
         solids[x][y][z] = value;
+        if (old != value) markDirty(x, y, z);
     }
 
     public int getDelta(int x, int y, int z) {
@@ -225,6 +238,47 @@ public class WaterRegion {
     }
 
     /* -------------------------------------------- */
+    /*                     dirty                    */
+    /* -------------------------------------------- */
+
+    private int flatIndex(int x, int y, int z) {
+        return (x * size + y) * size + z;
+    }
+
+    public boolean hasDirtyCells() {
+        return !dirtyIndices.isEmpty();
+    }
+
+    public IntArrayList drainDirtyIndices() {
+        if (dirtyIndices.isEmpty()) return new IntArrayList();
+
+        IntArrayList out = new IntArrayList(dirtyIndices);
+        // clear + reset mask
+        for (int i = 0; i < dirtyIndices.size(); i++) {
+            int idx = dirtyIndices.getInt(i);
+            dirtyMask[idx] = false;
+        }
+        dirtyIndices.clear();
+        return out;
+    }
+
+    public void markDirty(int x, int y, int z) {
+        int idx = flatIndex(x, y, z);
+        if (!dirtyMask[idx]) {
+            dirtyMask[idx] = true;
+            dirtyIndices.add(idx);
+        }
+    }
+
+    public boolean areSolidsInitialized() {
+        return solidsInitialized;
+    }
+
+    public void setSolidsInitialized(boolean solidsInitialized) {
+        this.solidsInitialized = solidsInitialized;
+    }
+
+    /* -------------------------------------------- */
     /*            foundational structure            */
     /* -------------------------------------------- */
 
@@ -245,6 +299,7 @@ public class WaterRegion {
                     if (d != 0) {
                         levels[x][y][z] += d;
                         deltas[x][y][z] = 0;
+                        markDirty(x, y, z);
                         falling[x][y][z] = false;
                         if (levels[x][y][z] > 0) owned[x][y][z] = true;
                         any = true;
