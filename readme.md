@@ -15,7 +15,7 @@ Gradient replaces the basic vanilla Minecraft water physics with a more realisti
 
 ## Features
 - Conservation: water levels are conserved when transferred between pools and cannot achieve infinity
-- Multi-level water: fluid height is treated as a continuous/quantized level rather than source blocks
+- Multi-level water: fluid height is treated as a discrete level rather than source blocks
 - Region-based simulation: water state is stored and updated in discrete regions for performance and locality
 - Lazy assimilation: vanilla water converts into simulated water only when interacted with
 - Adjustable tick rates: adjust sim step interval and world sync interval for different hardware/server TPS targets
@@ -49,8 +49,8 @@ Gradient replaces the basic vanilla Minecraft water physics with a more realisti
 
 ### Developers
 ```bash
-git clone https://github.com/<YOUR_USER>/gradient.git
-cd gradient
+git clone https://github.com/JaddotWuzHere/Gradient.git
+cd Gradient
 ./gradlew build
 ```
 
